@@ -1,0 +1,10 @@
+npx eslint src --fix
+
+npm install express-session cookie-parser --force ( both in ui and backend)
+
+npm install dotenv
+
+
+
+npm run lint
+npm run build

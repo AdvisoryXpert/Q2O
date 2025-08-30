@@ -1,0 +1,35 @@
+/* ChatBot Tooltip */
+
+.rcb-chat-tooltip {
+	position: fixed;
+	padding: 16px;
+	border-radius: 20px;
+	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+	white-space: nowrap;
+	cursor: pointer;
+	font-size: 20px;
+	transition: transform 0.3s ease;
+	z-index: 9999;
+}
+
+.rcb-chat-tooltip-tail {
+	content: "";
+	position: absolute;
+	top: 50%;
+	right: -10px;
+	margin-top: -10px;
+	border-width: 10px 0 10px 10px;
+	border-style: solid;
+}
+
+.rcb-chat-tooltip.rcb-tooltip-hide {
+	opacity: 0;
+	visibility: hidden;
+	animation: rcb-animation-tooltip-out 0.5s ease-in-out;
+}
+
+.rcb-chat-tooltip.rcb-tooltip-show {
+	opacity: 1;
+	visibility: visible;
+	animation: rcb-animation-tooltip-in 0.5s ease-in-out;
+}
