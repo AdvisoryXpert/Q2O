@@ -14,6 +14,11 @@ const Login: React.FC = () => {
 	const [step, setStep] = useState("password"); // password, 2fa, qr
 	const [qrCode, setQrCode] = useState("");
 	const [canRegenerate, setCanRegenerate] = useState(false);
+	const [forgotPasswordMode, setForgotPasswordMode] = useState(false);
+	const [newPassword, setNewPassword] = useState("");
+	const [confirmPassword, setConfirmPassword] = useState("");
+	const [forgotPasswordMessage, setForgotPasswordMessage] = useState("");
+	const [forgotPasswordMessageType, setForgotPasswordMessageType] = useState<"success" | "error">("error");
 
 	const navigate = useNavigate();
 
@@ -97,6 +102,36 @@ const Login: React.FC = () => {
 			setError("Server error. Try again later.");
 		}
 	};
+    
+	const handleForgotPassword = async (e: React.FormEvent) => {
+		e.preventDefault();
+		if (newPassword !== confirmPassword) {
+			setForgotPasswordMessage("Passwords do not match.");
+			setForgotPasswordMessageType("error");
+			return;
+		}
+		try {
+			const response = await axios.post(`${API}/api/change-password`, {
+				mobile,
+				newPassword,
+			}, {
+				withCredentials: true
+			});
+    
+			if (response.data.success) {
+				setForgotPasswordMessage("Password updated successfully. Please login.");
+				setForgotPasswordMessageType("success");
+				setForgotPasswordMode(false);
+			} else {
+				setForgotPasswordMessage(response.data.error || "An error occurred.");
+				setForgotPasswordMessageType("error");
+			}
+		} catch (err: any) {
+			console.error("Forgot password error:", err?.response || err?.message || err);
+			setForgotPasswordMessage("Server error. Try again later.");
+			setForgotPasswordMessageType("error");
+		}
+	};
 
 	return (
 		<div className="login-container">
@@ -106,10 +141,10 @@ const Login: React.FC = () => {
 			<div className="login-right">
 				<div className="login-box">
 					<img src={logo} alt="RO Chennai Logo" className="logo-image" />
-					{step === "password" && (
+					{forgotPasswordMode ? (
 						<>
-							<h2 className="login-title">Login or Create an Account</h2>
-							<form onSubmit={handleLogin} className="login-form">
+							<h2 className="login-title">Forgot Password</h2>
+							<form onSubmit={handleForgotPassword} className="login-form">
 								<label htmlFor="mobile">Mobile Number</label>
 								<input
 									id="mobile"
@@ -122,49 +157,96 @@ const Login: React.FC = () => {
 									onChange={(e) => setMobile(e.target.value)}
 									placeholder="Enter your 10-digit mobile number"
 								/>
-								<label htmlFor="password">Password</label>
+								<label htmlFor="newPassword">New Password</label>
 								<input
-									id="password"
+									id="newPassword"
 									type="password"
 									required
-									value={password}
-									onChange={(e) => setPassword(e.target.value)}
-									placeholder="Enter your password"
+									value={newPassword}
+									onChange={(e) => setNewPassword(e.target.value)}
+									placeholder="Enter your new password"
 								/>
-								<button type="submit" className="login-button">Login</button>
-								{error && <p className="login-error">{error}</p>}
+								<label htmlFor="confirmPassword">Confirm New Password</label>
+								<input
+									id="confirmPassword"
+									type="password"
+									required
+									value={confirmPassword}
+									onChange={(e) => setConfirmPassword(e.target.value)}
+									placeholder="Confirm your new password"
+								/>
+								<button type="submit" className="login-button">Submit</button>
+								{forgotPasswordMessage && <p className={`login-message ${forgotPasswordMessageType}`}>
+									{forgotPasswordMessage}</p>}
 							</form>
 							<div className="login-links">
-								<a href="#">Forgot Your Password?</a>
+								<a href="#" onClick={() => setForgotPasswordMode(false)}>Back to Login</a>
 							</div>
 						</>
-					)}
-					{step === "qr" && (
+					) : (
 						<>
-							<h2 className="login-title">Scan QR Code</h2>
-							<p>Scan this QR code with your Google Authenticator app.</p>
-							<img src={qrCode} alt="QR Code" />
-							<button onClick={() => setStep("2fa")} className="login-button">Continue</button>
-						</>
-					)}
-					{step === "2fa" && (
-						<>
-							<h2 className="login-title">Enter 2FA Token</h2>
-							<form onSubmit={handleVerify} className="login-form">
-								<label htmlFor="token">Authenticator Code</label>
-								<input
-									id="token"
-									type="text"
-									required
-									value={token}
-									onChange={(e) => setToken(e.target.value)}
-									placeholder="Enter your 6-digit code"
-								/>
-								<button type="submit" className="login-button">Verify</button>
-								{error && <p className="login-error">{error}</p>}
-							</form>
-							{!!canRegenerate && <button onClick={handleRegenerate} 
-								className="regenerate-button">Regenerate QR Code</button>}
+							{step === "password" && (
+								<>
+									<h2 className="login-title">Login or Create an Account</h2>
+									<form onSubmit={handleLogin} className="login-form">
+										<label htmlFor="mobile">Mobile Number</label>
+										<input
+											id="mobile"
+											type="tel"
+											pattern="[6-9]{1}[0-9]{9}"
+											title="Enter valid 10-digit mobile number"
+											maxLength={10}
+											required
+											value={mobile}
+											onChange={(e) => setMobile(e.target.value)}
+											placeholder="Enter your 10-digit mobile number"
+										/>
+										<label htmlFor="password">Password</label>
+										<input
+											id="password"
+											type="password"
+											required
+											value={password}
+											onChange={(e) => setPassword(e.target.value)}
+											placeholder="Enter your password"
+										/>
+										<button type="submit" className="login-button">Login</button>
+										{error && <p className="login-error">{error}</p>}
+									</form>
+									<div className="login-links">
+										<a href="#" onClick={() => setForgotPasswordMode(true)}>
+											Forgot Your Password?</a>
+									</div>
+								</>
+							)}
+							{step === "qr" && (
+								<>
+									<h2 className="login-title">Scan QR Code</h2>
+									<p>Scan this QR code with your Google Authenticator app.</p>
+									<img src={qrCode} alt="QR Code" />
+									<button onClick={() => setStep("2fa")} className="login-button">Continue</button>
+								</>
+							)}
+							{step === "2fa" && (
+								<>
+									<h2 className="login-title">Enter 2FA Token</h2>
+									<form onSubmit={handleVerify} className="login-form">
+										<label htmlFor="token">Authenticator Code</label>
+										<input
+											id="token"
+											type="text"
+											required
+											value={token}
+											onChange={(e) => setToken(e.target.value)}
+											placeholder="Enter your 6-digit code"
+										/>
+										<button type="submit" className="login-button">Verify</button>
+										{error && <p className="login-error">{error}</p>}
+									</form>
+									{!!canRegenerate && <button onClick={handleRegenerate} 
+										className="regenerate-button">Regenerate QR Code</button>}
+								</>
+							)}
 						</>
 					)}
 				</div>
