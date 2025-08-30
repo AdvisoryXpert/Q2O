@@ -3,8 +3,8 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import "./Login.css";
 import API from '../../apiConfig';
-import logo from './aquapot-2019-vc.png';
-import banner from './b1-700x269.png';
+import logo from '../../../assets/QuoteToOrder.png';
+import banner from '../../../assets/Whisk_cf2e3ae24d.jpg';
 
 const Login: React.FC = () => {
 	const [mobile, setMobile] = useState("");
