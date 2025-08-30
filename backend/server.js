@@ -204,6 +204,9 @@ app.use('/api', uploadPdfRouter);
 const quotesByPhoneRouter = require('./routes/quotesByPhone')(db);
 app.use('/api/quotes', quotesByPhoneRouter);
 
+const changePasswordRouter = require('./routes/changePassword');
+app.use('/api', changePasswordRouter);
+
 app.get('/quotes', (req, res) => {
     const sql = 'SELECT * FROM ro_cpq.quotation ORDER BY date_created DESC';
     db.query(sql, (err, results) => {
@@ -446,6 +449,6 @@ app.get('/quotation-items/:quote_id', (req, res) => {
   cert: fs.readFileSync(path.resolve(__dirname, '../cert.pem')),
   };
 
-  https.createServer(httpsOptions, app).listen(5000, '192.168.1.3', () => {
-    console.log('✅ HTTPS backend running at https://192.168.1.3:5000');
+  https.createServer(httpsOptions, app).listen(5000 , '192.168.1.3', () => {
+    console.log('✅ HTTPS backend running at https://192.168.1.3:5000 ');
 });

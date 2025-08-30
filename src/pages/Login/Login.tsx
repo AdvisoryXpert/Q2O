@@ -121,7 +121,6 @@ const Login: React.FC = () => {
 			if (response.data.success) {
 				setForgotPasswordMessage("Password updated successfully. Please login.");
 				setForgotPasswordMessageType("success");
-				setForgotPasswordMode(false);
 			} else {
 				setForgotPasswordMessage(response.data.error || "An error occurred.");
 				setForgotPasswordMessageType("error");
@@ -176,11 +175,12 @@ const Login: React.FC = () => {
 									placeholder="Confirm your new password"
 								/>
 								<button type="submit" className="login-button">Submit</button>
-								{forgotPasswordMessage && <p className={`login-message ${forgotPasswordMessageType}`}>
-									{forgotPasswordMessage}</p>}
+								{forgotPasswordMessage && <p className={`login-message 
+										${forgotPasswordMessageType}`}>{forgotPasswordMessage}</p>}
 							</form>
 							<div className="login-links">
-								<a href="#" onClick={() => setForgotPasswordMode(false)}>Back to Login</a>
+								<a href="#" onClick={() => 
+									setForgotPasswordMode(false)}>Back to Login</a>
 							</div>
 						</>
 					) : (
@@ -214,8 +214,8 @@ const Login: React.FC = () => {
 										{error && <p className="login-error">{error}</p>}
 									</form>
 									<div className="login-links">
-										<a href="#" onClick={() => setForgotPasswordMode(true)}>
-											Forgot Your Password?</a>
+										<a href="#" onClick={() => 
+											setForgotPasswordMode(true)}>Forgot Your Password?</a>
 									</div>
 								</>
 							)}
