@@ -25,6 +25,7 @@ import FollowUpScreen from "./pages/followUpScreen";
 import ConsolidatedAdmin from "./pages/ConsolidatedAdmin";
 import PricingAdmin from "./pages/PricingAdmin";
 import AnalyticsPage from "./pages/AnalyticsPage";
+import LandingPage from "./pages/LandingPage";
 
 export const isAuthenticated = async () => {
 	const userMobile = await getUserMobile();
@@ -34,7 +35,8 @@ export const isAuthenticated = async () => {
 const Router = () => {
 	return (
 		<Routes>
-			<Route path="/" element={<Login />} />
+			<Route path="/" element={<LandingPage />} />
+			<Route path="/login" element={<Login />} />
 
 			<Route
 				path="/Home"

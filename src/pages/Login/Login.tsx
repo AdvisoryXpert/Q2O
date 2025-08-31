@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import "./Login.css";
 import API from '../../apiConfig';
 import logo from '../../../assets/QuoteToOrder.png';
@@ -138,6 +138,7 @@ const Login: React.FC = () => {
 				<img src={banner} alt="Banner" className="banner-image" />
 			</div>
 			<div className="login-right">
+				<Link to="/" className="home-link">Home Page</Link>
 				<div className="login-box">
 					<img src={logo} alt="RO Chennai Logo" className="logo-image" />
 					{forgotPasswordMode ? (
