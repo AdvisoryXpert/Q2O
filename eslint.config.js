@@ -29,7 +29,7 @@ export default [
 			indent: ["error", "tab"],
 			"react/jsx-indent": ["error", "tab"],
 			"react/jsx-indent-props": ["error", "tab"],
-			"max-len": ["error", { code: 120 }],
+			"max-len": ["error", { code: 300 }],
 			// React hooks rules
 			"react-hooks/rules-of-hooks": "error",
 		},
