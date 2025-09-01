@@ -1,7 +1,9 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import GetInTouchPopup from '../components/GetInTouchPopup';
 
 const LandingPage = () => {
+	const [showPopup, setShowPopup] = useState(false);
 	useEffect(() => {
 		const aosStyle = document.createElement('link');
 		aosStyle.href = "https://unpkg.com/aos@2.3.1/dist/aos.css";
@@ -297,8 +299,9 @@ const LandingPage = () => {
 								Our intuitive editor makes it easy to create professional 
 								proposals that win business.
 							</p>
-							<a href="#" className="btn btn-primary">Try for free</a>
-							<a href="#" className="btn btn-outline-primary">Request a demo →</a>
+							<a href="#" className="btn btn-primary me-2">Try for free</a>
+							<button className="btn btn-outline-primary" 
+								onClick={() => setShowPopup(true)}>Request a demo →</button>
 						</div>
 					</div>
 					<div className="row align-items-center synopsis-row flex-row-reverse" data-aos="fade-left">
@@ -316,8 +319,9 @@ const LandingPage = () => {
 								into sales orders with a single click.
 								Track and manage your orders from start to finish.
 							</p>
-							<a href="#" className="btn btn-primary">Try for free</a>
-							<a href="#" className="btn btn-outline-primary">Request a demo →</a>
+							<a href="#" className="btn btn-primary me-2">								Try for free</a>
+							<button className="btn btn-outline-primary" 
+								onClick={() => setShowPopup(true)}>Request a demo →</button>
 						</div>
 					</div>
 					<div className="row align-items-center synopsis-row" data-aos="fade-right">
@@ -335,13 +339,13 @@ const LandingPage = () => {
 								Set up automated reminders for expiring warranties 
 								and provide better customer service.
 							</p>
-							<a href="#" className="btn btn-primary">Try for free</a>
+							<a href="#" className="btn btn-primary me-2">Try for free</a>
+							<button className="btn btn-outline-primary" 
+								onClick={() => setShowPopup(true)}>Request a demo →</button>
 						</div>
 					</div>
 				</div>
 			</section>
-
-			{/* Testimonials Section */}
 			<section id="testimonials" className="section">
 				<div className="container">
 					<h2 className="section-title" data-aos="fade-up">Loved by businesses worldwide</h2>
@@ -517,6 +521,8 @@ const LandingPage = () => {
 					<p>&copy; 2025 Qorza. All rights reserved.</p>
 				</div>
 			</footer>
+
+			{showPopup && <GetInTouchPopup isOpen={showPopup} onClose={() => setShowPopup(false)} />}
 		</div>
 	);
 };
