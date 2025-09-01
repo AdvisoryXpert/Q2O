@@ -128,6 +128,9 @@ const LandingPage = () => {
 				.how-it-works .step {
 					text-align: center;
 				}
+				.how-it-works .step p {
+					margin-bottom: 0.5rem;
+				}
 				.how-it-works .step-number {
 					display: inline-block;
 					width: 50px;
@@ -248,33 +251,40 @@ const LandingPage = () => {
 			<section className="section how-it-works bg-light">
 				<div className="container">
 					<h2 className="section-title" data-aos="fade-up">How It Works</h2>
-					<div className="row">
-						<div className="col-md-3" data-aos="fade-up">
+					<div className="row justify-content-around">
+						<div className="col-md-2" data-aos="fade-up">
 							<div className="step">
 								<div className="step-number">1</div>
 								<h6>Draft Quote</h6>
 								<p>Create a new quote using your products and services.</p>
 							</div>
 						</div>
-						<div className="col-md-3" data-aos="fade-up" data-aos-delay="200">
+						<div className="col-md-2" data-aos="fade-up" data-aos-delay="200">
 							<div className="step">
 								<div className="step-number">2</div>
 								<h6>Get Approval</h6>
 								<p>Send the quote to your client for their approval online.</p>
 							</div>
 						</div>
-						<div className="col-md-3" data-aos="fade-up" data-aos-delay="400">
+						<div className="col-md-2" data-aos="fade-up" data-aos-delay="400">
 							<div className="step">
 								<div className="step-number">3</div>
 								<h6>Convert to Order</h6>
 								<p>Once approved, convert the quote to an order instantly.</p>
 							</div>
 						</div>
-						<div className="col-md-3" data-aos="fade-up" data-aos-delay="600">
+						<div className="col-md-2" data-aos="fade-up" data-aos-delay="600">
 							<div className="step">
 								<div className="step-number">4</div>
 								<h6>Track & Deliver</h6>
 								<p>Manage the order fulfillment and track payments.</p>
+							</div>
+						</div>
+						<div className="col-md-2" data-aos="fade-up" data-aos-delay="800">
+							<div className="step">
+								<div className="step-number">5</div>
+								<h6>Warranty Support</h6>
+								<p>Effortlessly manage product warranties and provide timely support.</p>
 							</div>
 						</div>
 					</div>
