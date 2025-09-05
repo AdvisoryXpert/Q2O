@@ -4,6 +4,7 @@ module.exports = (db) => {
 
 	router.get('/', async (req, res) => {
 		const user_id = req.query.user_id;
+		const tenant_id = req.tenant_id;
 	
 		if (!user_id) {
 			return res.status(400).json({ error: 'Missing user_id in query' });
@@ -15,8 +16,8 @@ module.exports = (db) => {
 						`SELECT q.quote_id, u.full_name
 						 FROM ro_cpq.quotation q
 						 JOIN ro_cpq.users u ON q.user_id = u.user_id
-						 WHERE q.status = 'Draft' AND q.user_id = ?`,
-						[user_id],
+						 WHERE q.status = 'Draft' AND q.user_id = ? AND q.tenant_id = ?`,
+						[user_id, tenant_id],
 						(err, results) => err ? reject(err) : resolve(results)
 					);
 				}),
@@ -25,8 +26,8 @@ module.exports = (db) => {
 						`SELECT l.id AS lr_id, l.lr_number, u.full_name
 						 FROM ro_cpq.lr_receipts l
 						 JOIN ro_cpq.users u ON l.user_id = u.user_id
-						 WHERE l.status IN ('Pending', 'Open') AND l.user_id = ?`,
-						[user_id],
+						 WHERE l.status IN ('Pending', 'Open') AND l.user_id = ? AND l.tenant_id = ?`,
+						[user_id, tenant_id],
 						(err, results) => err ? reject(err) : resolve(results)
 					);
 				}),
@@ -35,8 +36,8 @@ module.exports = (db) => {
 						`SELECT s.id AS service_id, u.full_name, s.status
 						FROM ro_cpq.service_requests s
 						JOIN ro_cpq.users u ON s.user_id = u.user_id
-						WHERE s.status in ('Open','In Progress') AND s.user_id = ?`,
-						[user_id],
+						WHERE s.status in ('Open','In Progress') AND s.user_id = ? AND s.tenant_id = ?`,
+						[user_id, tenant_id],
 						(err, results) => err ? reject(err) : resolve(results)
 					);
 				})

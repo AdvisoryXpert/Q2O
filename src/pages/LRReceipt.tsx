@@ -20,7 +20,7 @@ import { useSearchParams } from "react-router-dom";
 import TopAppBar from "../navBars/topAppBar";
 import App from "../App";
 import { useNavAccess } from "../navBars/navBars";
-import API from '../apiConfig'; 
+import { http } from '../lib/http'; 
 type LRReceipt = {
 	id: string;
 	lr_number: string;
@@ -47,9 +47,8 @@ const LRTable = () => {
 	const fetchData = async () => {
 		try {
 			setIsLoading(true);
-			const res = await fetch(`${API}/api/lr-receipts`);
-			if (!res.ok) throw new Error("Network response was not ok");
-			const data = await res.json();
+			const res = await http.get('/lr-receipts');
+			const data = res.data;
 			setReceipts(data);
 
 			// Filter by lr_id if present in URL
@@ -90,12 +89,7 @@ const LRTable = () => {
 		}
 		try {
 			const payload = { ...values, user_id: userId };
-			const response = await fetch(`${API}/api/lr-receipts`, {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify(payload),
-			});
-			if (!response.ok) throw new Error("Failed to create record");
+			await http.post('/lr-receipts', payload);
 			await fetchData();
 			return true;
 		} catch (error) {
@@ -112,12 +106,7 @@ const LRTable = () => {
 		}
 		try {
 			const payload = { ...values, user_id: currentUserId };
-			const response = await fetch(`${API}/api/lr-receipts/${values.id}`, {
-				method: "PUT",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify(payload),
-			});
-			if (!response.ok) throw new Error("Failed to update record");
+			await http.put(`/lr-receipts/${values.id}`, payload);
 			await fetchData();
 			return true;
 		} catch (error) {
@@ -134,13 +123,7 @@ const LRTable = () => {
 		formData.append("file", file); // ✅ Field name must match backend
 	  
 		try {
-		  const response = await fetch(`${API}/api/lr-receipts/${id}/attachment`, {
-				method: "PUT",
-				body: formData,
-			// ❗ DO NOT set Content-Type manually
-		  });
-	  
-		  if (!response.ok) throw new Error("Upload failed");
+		  await http.put(`/lr-receipts/${id}/attachment`, formData);
 	  
 		  await fetchData(); // ✅ Refresh the table
 		} catch (error) {
@@ -196,7 +179,7 @@ const LRTable = () => {
 			Cell: ({ cell }) =>
 				cell.getValue() ? (
 					<a
-						href={`${API}/uploads/lr-receipts/${cell.getValue()}`}
+						href={`/uploads/lr-receipts/${cell.getValue()}`}
 						target="_blank"
 						rel="noopener noreferrer"
 					>

@@ -15,7 +15,7 @@ import {
 	Paper,
 	TablePagination,
 } from '@mui/material';
-import API from '../apiConfig'; 
+import { http } from '../lib/http'; 
 import { useParams } from 'react-router-dom';
 
 const OrderDispatchView = () => {
@@ -30,8 +30,8 @@ const OrderDispatchView = () => {
 	useEffect(() => {
 		const fetchOrderDetails = async () => {
 			try {
-				const res = await fetch(`${API}/api/dispatchorders/order-details/${orderId}`);
-				const data = await res.json();
+				const res = await http.get(`/dispatchorders/order-details/${orderId}`);
+				const data = res.data;
 				setOrderHeader(data.header);
 				console.log('Fetched line items:', data.lineItems);
 				setOrderLines(data.lineItems);

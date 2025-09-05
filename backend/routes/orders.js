@@ -5,6 +5,7 @@ const db = require('../db');
 // Create a new order (without quote)
 router.post('/', (req, res) => {
   const { user_id, dealer_id, total_price, cartItems } = req.body;
+  const tenant_id = req.tenant_id;
 
   if (!user_id || !dealer_id || !Array.isArray(cartItems) || cartItems.length === 0) {
     return res.status(400).json({ error: 'Invalid order data' });
@@ -15,7 +16,8 @@ router.post('/', (req, res) => {
     dealer_id,
     total_price,
     status: 'For Dispatch',
-    date_created: new Date()
+    date_created: new Date(),
+    tenant_id
   };
 
   db.query('INSERT INTO orders SET ?', orderData, (err, orderResult) => {
@@ -35,12 +37,13 @@ router.post('/', (req, res) => {
       item.total_price,
       item.quantity,
       item.original_quote_item_id || null,
-      item.serial_number || null
+      item.serial_number || null,
+      tenant_id
     ]);
 
     const insertLineQuery = `
       INSERT INTO order_line 
-      (order_id, product_id, product_attribute_id, unit_price, total_price, quantity, original_quote_item_id, serial_number)
+      (order_id, product_id, product_attribute_id, unit_price, total_price, quantity, original_quote_item_id, serial_number, tenant_id)
       VALUES ?
     `;
 

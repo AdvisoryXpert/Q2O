@@ -13,8 +13,7 @@ import AddIcon from '@mui/icons-material/Add';
 import TopAppBar from '../navBars/topAppBar';
 import App from '../App';
 import { useNavAccess } from '../navBars/navBars';
-import API from '../apiConfig';
-import axios from 'axios';
+import { http } from '../lib/http';
 import { useNavigate } from 'react-router-dom';
 
 const POSPage = () => {
@@ -31,7 +30,7 @@ const POSPage = () => {
 	useEffect(() => {
 		const fetchProducts = async () => {
 			try {
-				const res = await axios.get(`${API}/api/product_variants?all=true`);
+				const res = await http.get('/product_variants?all=true');
 				setProducts(res.data.products);
 				console.log("Fetched products:", res.data.products);
 				if (res.data.products.length > 0) {
@@ -52,7 +51,7 @@ const POSPage = () => {
 		};
 
 		const fetchDealers = async () => {
-			const res = await axios.get(`${API}/api/dealers`);
+			const res = await http.get('/dealers');
 			setDealers(res.data);
 		};
 
@@ -141,7 +140,7 @@ const POSPage = () => {
 		if (!dealerDetails) return alert("Invalid dealer selected");
 
 		try {
-			const response = await axios.post(`${API}/dealer-quotation-from-cart`, {
+			const response = await http.post('/dealer-quotation-from-cart', {
 				dealer: dealerDetails,
 				user_id,
 				total_price: total,

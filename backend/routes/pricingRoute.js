@@ -12,6 +12,7 @@ module.exports = (db) => {
   router.get("/:attribute_id", (req, res) => {
     const attrId = req.params.attribute_id;
     const dealerId = req.query.dealer_id;
+    const tenant_id = req.tenant_id;
 
     if (!dealerId) {
       return res.status(400).json({ error: "Missing dealer_id in query parameters." });
@@ -28,14 +29,14 @@ module.exports = (db) => {
       CROSS JOIN (
         SELECT cost_price, price
         FROM ro_cpq.product_pricing
-        WHERE attribute_id = ?
+        WHERE attribute_id = ? AND tenant_id = ?
         ORDER BY min_quantity DESC
         LIMIT 1
       ) pp
-      WHERE dlr.dealer_id = ?
+      WHERE dlr.dealer_id = ? AND dlr.tenant_id = ?
     `;
 
-    db.query(marginAndPriceSql, [attrId, dealerId], (err, rows) => {
+    db.query(marginAndPriceSql, [attrId, tenant_id, dealerId, tenant_id], (err, rows) => {
       if (err) {
         console.error("Pricing+Margin lookup error:", err);
         return res.status(500).json({ error: "Database error during pricing/margin lookup" });

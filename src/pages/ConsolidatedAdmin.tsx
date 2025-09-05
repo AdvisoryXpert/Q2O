@@ -12,7 +12,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import TopAppBar from '../navBars/topAppBar';
 import App from '../App';
 import { useNavAccess } from '../navBars/navBars';
-import API from '../apiConfig';
+import { http } from '../lib/http';
 
 type Condition = {
   condition_id: number;
@@ -61,9 +61,8 @@ const ConsolidatedAdmin = () => {
 	const fetchConditions = async () => {
 		try {
 			setIsLoading(true);
-			const res = await fetch(`${API}/api/conditions`);
-			const data = await res.json();
-			setConditions(data);
+			const res = await http.get('/conditions');
+			setConditions(res.data);
 		} catch (err) {
 			console.error("Failed to load conditions", err);
 		} finally {
@@ -74,9 +73,8 @@ const ConsolidatedAdmin = () => {
 	const fetchProducts = async (condition_id: number) => {
 		try {
 			setIsLoading(true);
-			const res = await fetch(`${API}/api/products?condition_id=${condition_id}`);
-			const data = await res.json();
-			setProducts(data);
+			const res = await http.get(`/products?condition_id=${condition_id}`);
+			setProducts(res.data);
 			setAttributes([]);
 			setSelectedProductId(null);
 		} catch (err) {
@@ -90,9 +88,8 @@ const ConsolidatedAdmin = () => {
 	const fetchAttributes = async (product_id: number) => {
 		try {
 			setIsLoading(true);
-			const res = await fetch(`${API}/api/product-attributes?product_id=${product_id}`);
-			const data = await res.json();
-			setAttributes(data);
+			const res = await http.get(`/product-attributes?product_id=${product_id}`);
+			setAttributes(res.data);
 		} catch (err) {
 			console.error("Failed to load attributes", err);
 		} finally {
@@ -103,9 +100,7 @@ const ConsolidatedAdmin = () => {
 	const handleDeleteCondition = async (row: MRT_Row<Condition>) => {
 		if (window.confirm(`Are you sure you want to delete condition ${row.original.condition_id}?`)) {
 			try {
-				await fetch(`${API}/api/conditions/${row.original.condition_id}`, {
-					method: 'DELETE',
-				});
+				await http.delete(`/conditions/${row.original.condition_id}`);
 				await fetchConditions();
 				setSelectedConditionId(null);
 			} catch (err) {
@@ -117,9 +112,7 @@ const ConsolidatedAdmin = () => {
 	const handleDeleteProduct = async (row: MRT_Row<Product>) => {
 		if (window.confirm(`Are you sure you want to delete product ${row.original.name}?`)) {
 			try {
-				await fetch(`${API}/api/products/${row.original.product_id}`, {
-					method: 'DELETE',
-				});
+				await http.delete(`/products/${row.original.product_id}`);
 				if (selectedConditionId) await fetchProducts(selectedConditionId);
 			} catch (err) {
 				console.error("Failed to delete product", err);
@@ -130,9 +123,7 @@ const ConsolidatedAdmin = () => {
 	const handleDeleteAttribute = async (row: MRT_Row<Attribute>) => {
 		if (window.confirm(`Are you sure you want to delete attribute ${row.original.name}?`)) {
 			try {
-				await fetch(`${API}/api/product-attributes/${row.original.attribute_id}`, {
-					method: 'DELETE',
-				});
+				await http.delete(`/product-attributes/${row.original.attribute_id}`);
 				if (selectedProductId) await fetchAttributes(selectedProductId);
 			} catch (err) {
 				console.error("Failed to delete attribute", err);
@@ -148,10 +139,7 @@ const ConsolidatedAdmin = () => {
 			formData.append('image', file);
 
 			try {
-				await fetch(`${API}/api/product-attributes/${attribute_id}/upload-image`, {
-					method: 'POST',
-					body: formData,
-				});
+				await http.post(`/product-attributes/${attribute_id}/upload-image`, formData);
 				if (selectedProductId) fetchAttributes(selectedProductId);
 			} catch (err) {
 				console.error("Failed to upload image", err);
@@ -167,10 +155,7 @@ const ConsolidatedAdmin = () => {
 			formData.append('specification', file);
 
 			try {
-				await fetch(`${API}/api/product-attributes/${attribute_id}/upload-specification`, {
-					method: 'POST',
-					body: formData,
-				});
+				await http.post(`/product-attributes/${attribute_id}/upload-specification`, formData);
 				if (selectedProductId) fetchAttributes(selectedProductId);
 			} catch (err) {
 				console.error("Failed to upload specification", err);
@@ -231,8 +216,8 @@ const ConsolidatedAdmin = () => {
 			Cell: ({ row }) => (
 				<>
 					{row.original.image_url && (
-						<a href={`${API}${row.original.image_url}`} target="_blank" rel="noopener noreferrer">
-							<img src={`${API}${row.original.image_url}`} alt="Product Attribute" width="100" />
+						<a href={row.original.image_url} target="_blank" rel="noopener noreferrer">
+							<img src={row.original.image_url} alt="Product Attribute" width="100" />
 						</a>
 					)}
 				</>
@@ -252,7 +237,7 @@ const ConsolidatedAdmin = () => {
 			Cell: ({ row }) => (
 				<>
 					{row.original.specification_url && (
-						<a href={`${API}${row.original.specification_url}`} target="_blank" rel="noopener noreferrer">
+						<a href={row.original.specification_url} target="_blank" rel="noopener noreferrer">
 							{row.original.specification_url.split('/').pop()}
 						</a>
 					)}
@@ -275,7 +260,7 @@ const ConsolidatedAdmin = () => {
 								\nTDS: ${c?.tds_min}-${c?.tds_max}
 								\nHardness: ${c?.hardness_min}-${c?.hardness_max}`;
 								const imageUrl = row.original.image_url ? 
-									`\nImage: ${API}${row.original.image_url}` : '';
+									`\nImage: ${row.original.image_url}` : '';
 								const url = `https://web.whatsapp.com/send?phone=${phone}&text=
 								${encodeURIComponent(text + imageUrl)}`;
 								window.open(url, "_blank");
@@ -337,11 +322,7 @@ const ConsolidatedAdmin = () => {
 		),
 		onCreatingRowSave: async ({ values, table }) => {
 			try {
-				await fetch(`${API}/api/conditions`, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify(values)
-				});
+				await http.post('/conditions', values);
 				await fetchConditions();
 				table.setCreatingRow(null);
 			} catch (err) {
@@ -350,11 +331,7 @@ const ConsolidatedAdmin = () => {
 		},
 		onEditingRowSave: async ({ values,table }) => {
 			try {
-				await fetch(`${API}/api/conditions/${values.condition_id}`, {
-					method: 'PUT',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify(values)
-				});
+				await http.put(`/conditions/${values.condition_id}`, values);
 				await fetchConditions();
 				table.setEditingRow(null);
 			} catch (err) {
@@ -414,11 +391,7 @@ const ConsolidatedAdmin = () => {
 		onCreatingRowSave: async ({ values, table }) => {
 			if (!selectedConditionId) return;
 			try {
-				await fetch(`${API}/api/products`, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ ...values, condition_id: selectedConditionId })
-				});
+				await http.post('/products', { ...values, condition_id: selectedConditionId });
 				await fetchProducts(selectedConditionId);
 				table.setCreatingRow(null);
 			} catch (err) {
@@ -427,11 +400,7 @@ const ConsolidatedAdmin = () => {
 		},
 		onEditingRowSave: async ({ values,table }) => {
 			try {
-				await fetch(`${API}/api/products/${values.product_id}`, {
-					method: 'PUT',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify(values)
-				});
+				await http.put(`/products/${values.product_id}`, values);
 				if (selectedConditionId) await fetchProducts(selectedConditionId);
 				table.setEditingRow(null);
 			} catch (err) {
@@ -476,11 +445,7 @@ const ConsolidatedAdmin = () => {
 		onCreatingRowSave: async ({ values, table }) => {
 			if (!selectedProductId) return;
 			try {
-				await fetch(`${API}/api/product-attributes`, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ ...values, product_id: selectedProductId })
-				});
+				await http.post('/product-attributes', { ...values, product_id: selectedProductId });
 				await fetchAttributes(selectedProductId);
 				table.setCreatingRow(null);
 			} catch (err) {
@@ -489,11 +454,7 @@ const ConsolidatedAdmin = () => {
 		},
 		onEditingRowSave: async ({ values,table }) => {
 			try {
-				await fetch(`${API}/api/product-attributes/${values.attribute_id}`, {
-					method: 'PUT',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify(values)
-				});
+				await http.put(`/product-attributes/${values.attribute_id}`, values);
 				if (selectedProductId) await fetchAttributes(selectedProductId);
 				table.setEditingRow(null);
 			} catch (err) {

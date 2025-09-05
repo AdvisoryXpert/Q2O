@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { MaterialReactTable, type MRT_ColumnDef } from 'material-react-table';
 import { Box, Typography, TextField, Button } from '@mui/material';
-import API from '../apiConfig';
+import { http } from '../lib/http';
 import TopAppBar from '../navBars/topAppBar';
 import { useNavAccess } from '../navBars/navBars';
 
@@ -48,17 +48,13 @@ const AnalyticsPage: React.FC = () => {
 			if (filterStartDate) params.append('start_date', filterStartDate);
 			if (filterEndDate) params.append('end_date', filterEndDate);
 
-			const logsRes = await fetch(`${API}/api/analytics/logs?${params.toString()}`);
-			const summaryRes = await fetch(`${API}/api/analytics/summary`);
+			const [logsRes, summaryRes] = await Promise.all([
+				http.get(`/analytics/logs?${params.toString()}`),
+				http.get('/analytics/summary'),
+			]);
 
-			if (!logsRes.ok) throw new Error(`HTTP error! status: ${logsRes.status}`);
-			if (!summaryRes.ok) throw new Error(`HTTP error! status: ${summaryRes.status}`);
-
-			const logsData = await logsRes.json();
-			const summaryData = await summaryRes.json();
-
-			setLogs(logsData);
-			setSummary(summaryData);
+			setLogs(logsRes.data);
+			setSummary(summaryRes.data);
 		} catch (err: any) {
 			console.error("Failed to fetch analytics data:", err);
 			setError(err.message || "An unknown error occurred");

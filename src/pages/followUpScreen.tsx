@@ -13,7 +13,7 @@ import {
 	Snackbar,
 	Alert,
 } from '@mui/material';
-import API from '../apiConfig';
+import { http } from '../lib/http';
 import TopAppBar from '../navBars/topAppBar';
 import App from '../App';
 import { useNavigate } from 'react-router-dom';
@@ -75,34 +75,28 @@ const FollowUpScreen = () => {
 	const fetchFollowUps = async () => {
 		const userRole = localStorage.getItem('userRole');
 		const userId = localStorage.getItem('user_id');
-		let url = `${API}/api/followups?userRole=${userRole}`;
+		let url = `/followups?userRole=${userRole}`;
 		if (userRole?.toLowerCase() === 'Employee'.toLowerCase()) {
-			url = `${API}/api/followups?userRole=${userRole}&userId=${userId}`;
+			url = `/followups?userRole=${userRole}&userId=${userId}`;
 		}
-		const res = await fetch(url);
-		const data = await res.json();
-		setFollowups(data);
+		const res = await http.get(url);
+		setFollowups(res.data);
 	};
 
 	const fetchUsers = async () => {
-		const res = await fetch(`${API}/api/userMgmt/usersList`);
-		const data = await res.json();
-		setUsers(data);
+		const res = await http.get('/userMgmt/usersList');
+		setUsers(res.data);
 	};
 
 	const handleUpdate = async (values: FollowUp) => {
-		const res = await fetch(`${API}/api/followups/${values.followup_id}`, {
-			method: 'PUT',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				status: values.status,
-				assigned_to: values.assigned_to,
-				due_date: values.due_date || null,
-				notes: values.notes || null,
-			}),
+		const res = await http.put(`/followups/${values.followup_id}`, {
+			status: values.status,
+			assigned_to: values.assigned_to,
+			due_date: values.due_date || null,
+			notes: values.notes || null,
 		});
 
-		if (res.ok) {
+		if (res.status === 200) {
 			setSnackbarOpen(true);
 		} else {
 			console.error("Update failed");

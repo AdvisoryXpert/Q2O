@@ -13,7 +13,7 @@ import {
 import EditIcon from '@mui/icons-material/Edit';
 import AddIcon from '@mui/icons-material/Add';
 import { MaterialReactTable, type MRT_ColumnDef } from 'material-react-table';
-import API from '../apiConfig'; 
+import { http } from '../lib/http'; 
 type RoleAccess = {
   id: number;
   role: string;
@@ -29,9 +29,8 @@ const RoleAccessSubview = () => {
 	const [showTable, setShowTable] = useState(false);
 
 	const fetchData = async () => {
-		const res = await fetch(`${API}/api/userMgmt/role-access`);
-		const json = await res.json();
-		setData(json);
+		const res = await http.get('/userMgmt/role-access');
+		setData(res.data);
 	};
 
 	useEffect(() => {
@@ -41,16 +40,12 @@ const RoleAccessSubview = () => {
 	}, [showTable]);
 
 	const handleSave = async () => {
-		const method = editingItem ? 'PUT' : 'POST';
+		const method = editingItem ? 'put' : 'post';
 		const url = editingItem
-			? `${API}/api/userMgmt/role-access/${editingItem.id}`
-			: `${API}/api/userMgmt/role-access`;
+			? `/userMgmt/role-access/${editingItem.id}`
+			: '/userMgmt/role-access';
 
-		await fetch(url, {
-			method,
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ role, icon_label: iconLabel }),
-		});
+		await http[method](url, { role, icon_label: iconLabel });
 
 		setOpen(false);
 		setEditingItem(null);

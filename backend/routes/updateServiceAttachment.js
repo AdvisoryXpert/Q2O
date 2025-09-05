@@ -26,6 +26,7 @@ router.post('/test-upload', (req, res) => {
 // ✅ Post /api/service-requests/:id/attachment
 router.post('/:id/attachment', async (req, res) => {
   const { id } = req.params;
+  const tenant_id = req.tenant_id;
 
   console.log('🟢 Upload triggered for ID:', id);
   console.log('🔍 req.files:', req.files);
@@ -51,7 +52,7 @@ router.post('/:id/attachment', async (req, res) => {
     await file.mv(filePath);
 
     // Delete old file if exists
-    db.query('SELECT file_path FROM service_requests WHERE id = ?', [id], (err, rows) => {
+    db.query('SELECT file_path FROM service_requests WHERE id = ? AND tenant_id = ?', [id, tenant_id], (err, rows) => {
       if (!err && rows.length > 0 && rows[0].file_path) {
         const oldFile = path.join(uploadDir, rows[0].file_path);
         if (fs.existsSync(oldFile)) fs.unlinkSync(oldFile);
@@ -60,8 +61,8 @@ router.post('/:id/attachment', async (req, res) => {
 
     // Update DB
     db.query(
-      'UPDATE service_requests SET file_path = ?, filename = ? WHERE id = ?',
-      [filename, file.name, id],
+      'UPDATE service_requests SET file_path = ?, filename = ? WHERE id = ? AND tenant_id = ?',
+      [filename, file.name, id, tenant_id],
       (err) => {
         if (err) {
           console.error('❌ DB update error:', err);
@@ -71,7 +72,7 @@ router.post('/:id/attachment', async (req, res) => {
         return res.json({
           success: true,
           message: 'Upload successful',
-          file_path: filename,
+          filePath: filename,
           filename: file.name,
         });
       }

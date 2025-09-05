@@ -4,9 +4,8 @@ import { Grid, Typography, Paper, Button, Stack } from '@mui/material';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import DescriptionIcon from '@mui/icons-material/Description';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
-import axios from 'axios';
+import { http } from '../lib/http'; 
 import { useNavigate } from 'react-router-dom';
-import API from '../apiConfig'; 
 const ReminderSection = () => {
 	const [reminders, setReminders] = useState([]);
 	const [currentPage, setCurrentPage] = useState(1);
@@ -21,7 +20,7 @@ const ReminderSection = () => {
 					console.warn("User ID not found. Cannot fetch reminders.");
 					return;
 				}
-				const res = await axios.get(`${API}/api/reminders?user_id=${user_id}`);
+				const res = await http.get(`/reminders?user_id=${user_id}`);
 
 				setReminders(res.data);
 			} catch (err) {

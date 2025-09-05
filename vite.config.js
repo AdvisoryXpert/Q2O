@@ -1,8 +1,8 @@
+// vite.config.ts
 import react from "@vitejs/plugin-react";
 import svgr from "vite-plugin-svgr";
 import path from "path";
 import eslint from "vite-plugin-eslint2";
-import fs from "fs"; // ✅ Add this to read certs
 import { defineConfig, loadEnv } from "vite";
 
 export default ({ mode }) => {
@@ -37,23 +37,21 @@ export default ({ mode }) => {
     },
     assetsInclude: ["**/*.svg", "**/*.png", "**/*.wav"],
     plugins: [
-      svgr({
-        svgrOptions: {
-          ref: true,
-        },
-      }),
-      react({
-        include: "**/*.{jsx,tsx}",
-      }),
+      svgr({ svgrOptions: { ref: true } }),
+      react({ include: "**/*.{jsx,tsx}" }),
       eslint(),
     ],
     server: {
       port: 3000,
-      host: "192.168.66.103", // ✅ Your system IP
-      https: {
-        key: fs.readFileSync("key.pem"),
-        cert: fs.readFileSync("cert.pem"),
-      },
+      host: "192.168.1.73", // your LAN IP (or use true to bind 0.0.0.0)
+      https: false,         // ✅ force HTTP (no certs)
+      proxy: {
+        '/api': {
+          target: 'http://localhost:5000',
+          changeOrigin: true,
+          secure: false,
+        }
+      }    
     },
   });
 };

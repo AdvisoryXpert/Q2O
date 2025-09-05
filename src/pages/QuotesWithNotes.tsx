@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
 import {
 	Box,
 	Typography,
@@ -13,7 +12,7 @@ import Bot from '../App';
 import { useNavAccess } from '../navBars/navBars';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
-import API from '../apiConfig'; 
+import { http } from '../lib/http'; 
 const QuotesWithNotes: React.FC = () => {
 	const navItems = useNavAccess();
 	const [quotes, setQuotes] = useState<any[]>([]);
@@ -24,7 +23,7 @@ const QuotesWithNotes: React.FC = () => {
 
 	const fetchQuotes = async () => {
 		try {
-			const res = await axios.get(`${API}/quotes`);
+			const res = await http.get('/quotes');
 			setQuotes(res.data);
 		} catch (error) {
 			console.error('Error fetching quotes:', error);
@@ -33,7 +32,7 @@ const QuotesWithNotes: React.FC = () => {
 
 	const fetchNotes = async (quoteId: number) => {
 		try {
-			const res = await axios.get(`${API}/notes/${quoteId}`);
+			const res = await http.get(`/notes/${quoteId}`);
 			setNotes(res.data || []);
 		} catch {
 			setNotes([]);
@@ -53,7 +52,7 @@ const QuotesWithNotes: React.FC = () => {
 	const saveNote = async () => {
 		if (!selectedQuoteId) return;
 		try {
-			await axios.post(`${API}/notes/${selectedQuoteId}`, {
+			await http.post(`/notes/${selectedQuoteId}`, {
 				content: noteContent,
 			});
 			setNoteContent('');

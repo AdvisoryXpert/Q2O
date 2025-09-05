@@ -35,7 +35,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import TopAppBar from "../navBars/topAppBar";
 import App from "../App";
 import { useNavAccess } from "../navBars/navBars";
-import API from "../apiConfig";
+import { http } from "../lib/http";
 
 // Dealer Type
 type Dealer = {
@@ -220,8 +220,8 @@ const DealerTable = () => {
 
 	const handleDelete = async (row: MRT_Row<Dealer>) => {
 		try {
-			const response = await fetch(`${API}/api/dealers/${row.original.dealer_id}/quotations/count`);
-			const data = await response.json();
+			const response = await http.get(`/dealers/${row.original.dealer_id}/quotations/count`);
+			const data = response.data;
 
 			if (data.quotationCount > 0) {
 				window.alert("This dealer has existing quotations and cannot be deleted.");
@@ -367,8 +367,8 @@ function useGetDealers() {
 	return useQuery<Dealer[]>({
 		queryKey: ["dealers"],
 		queryFn: async () => {
-			const res = await fetch(`${API}/api/dealers`);
-			return res.json();
+			const res = await http.get('/dealers');
+			return res.data;
 		},
 		refetchOnWindowFocus: false,
 	});
@@ -379,11 +379,7 @@ function useCreateDealer() {
 	const queryClient = useQueryClient();
 	return useMutation({
 		mutationFn: async (dealer: Partial<Dealer>) => {
-			await fetch(`${API}/api/dealers`, {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify(dealer),
-			});
+			await http.post('/dealers', dealer);
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["dealers"] });
@@ -396,11 +392,7 @@ function useUpdateDealer() {
 	const queryClient = useQueryClient();
 	return useMutation({
 		mutationFn: async (dealer: Dealer) => {
-			await fetch(`${API}/api/dealers/${dealer.dealer_id}`, {
-				method: "PUT",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify(dealer),
-			});
+			await http.put(`/dealers/${dealer.dealer_id}`, dealer);
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["dealers"] });
@@ -413,9 +405,7 @@ function useDeleteDealer() {
 	const queryClient = useQueryClient();
 	return useMutation({
 		mutationFn: async (dealerId: string) => {
-			await fetch(`${API}/api/dealers/${dealerId}`, {
-				method: "DELETE",
-			});
+			await http.delete(`/dealers/${dealerId}`);
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["dealers"] });

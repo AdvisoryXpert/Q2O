@@ -16,7 +16,7 @@ import TopAppBar from '../navBars/topAppBar';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import { useNavAccess } from '../navBars/navBars';
 import App from '../App';
-import API from '../apiConfig';
+import { http } from '../lib/http';
 import { useNavigate } from 'react-router-dom'; // ✅ Added import for navigate
 
 type Order = {
@@ -44,9 +44,8 @@ const OrderListPage = () => {
 	useEffect(() => {
 		const fetchOrders = async () => {
 			try {
-				const res = await fetch(`${API}/api/recentorders`);
-				const data = await res.json();
-				setOrders(data);
+				const res = await http.get('/recentorders');
+				setOrders(res.data);
 			} catch (err) {
 				console.error('Error fetching orders', err);
 			}
@@ -54,9 +53,8 @@ const OrderListPage = () => {
 
 		const fetchDealers = async () => {
 			try {
-				const res = await fetch(`${API}/api/dealers`);
-				const data = await res.json();
-				setDealers(data);
+				const res = await http.get('/dealers');
+				setDealers(res.data);
 			} catch (err) {
 				console.error('Error fetching dealers', err);
 			}
@@ -137,18 +135,12 @@ const OrderListPage = () => {
 											color="success"
 											onClick={async () => {
 												try {
-													const response = await fetch(`${API}/api/update-invoice-id`, {
-														method: "POST",
-														headers: {
-															"Content-Type": "application/json",
-														},
-														body: JSON.stringify({
-															order_id: order.order_id,
-															invoice_id: order.invoice_id ?? "",
-														}),
+													const response = await http.post('/update-invoice-id', {
+														order_id: order.order_id,
+														invoice_id: order.invoice_id ?? "",
 													});
 
-													const result = await response.json();
+													const result = response.data;
 													if (!result.success) {
 														alert("❌ Failed to save invoice ID");
 													} else {

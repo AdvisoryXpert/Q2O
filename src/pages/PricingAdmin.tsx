@@ -27,7 +27,7 @@ import {
 import TopAppBar from '../navBars/topAppBar';
 import App from '../App';
 import { useNavAccess } from '../navBars/navBars';
-import API from '../apiConfig';
+import { http } from '../lib/http';
 import AddPricingModal from './AddPricingModal';
 import EditPricingModal from './EditPricingModal';
 
@@ -71,12 +71,8 @@ const PricingAdmin = () => {
 	const fetchPricing = async () => {
 		setIsLoading(true);
 		try {
-			const res = await fetch(`${API}/api/product-pricing`);
-			if (!res.ok) {
-				throw new Error(`Server responded with ${res.status}`);
-			}
-			const data = await res.json();
-			setPricingData(Array.isArray(data) ? data : []);
+			const res = await http.get('/product-pricing');
+			setPricingData(Array.isArray(res.data) ? res.data : []);
 		} catch (err) {
 			console.error('Failed to fetch pricing', err);
 		} finally {
@@ -87,12 +83,8 @@ const PricingAdmin = () => {
 	const fetchAccountTypes = async () => {
 		setIsLoading(true);
 		try {
-			const res = await fetch(`${API}/api/account-types`);
-			if (!res.ok) {
-				throw new Error(`Server responded with ${res.status}`);
-			}
-			const data = await res.json();
-			setAccountTypes(Array.isArray(data) ? data : []);
+			const res = await http.get('/account-types');
+			setAccountTypes(Array.isArray(res.data) ? res.data : []);
 		} catch (err) {
 			console.error('Failed to fetch account types', err);
 		} finally {
@@ -144,16 +136,7 @@ const PricingAdmin = () => {
 		}
 		try {
 			setIsLoading(true);
-			const response = await fetch(`${API}/api/product-pricing`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(values),
-			});
-      
-			if (!response.ok) {
-				const errorData = await response.json();
-				throw new Error(errorData.error || 'Failed to create pricing');
-			}
+			await http.post('/product-pricing', values);
       
 			await fetchPricing();
 			table.setCreatingRow(null);
@@ -173,11 +156,7 @@ const PricingAdmin = () => {
 		}
 		try {
 			setIsLoading(true);
-			await fetch(`${API}/api/product-pricing/${values.pricing_id}`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(values),
-			});
+			await http.put(`/product-pricing/${values.pricing_id}`, values);
 			await fetchPricing();
 			exitEditingMode();
 			setValidationErrors({});
@@ -192,9 +171,7 @@ const PricingAdmin = () => {
 		if (window.confirm(`Are you sure you want to delete pricing ID ${row.pricing_id}?`)) {
 			try {
 				setIsLoading(true);
-				await fetch(`${API}/api/product-pricing/${row.pricing_id}`, {
-					method: 'DELETE',
-				});
+				await http.delete(`/product-pricing/${row.pricing_id}`);
 				await fetchPricing();
 			} catch (err) {
 				console.error('Delete failed', err);
@@ -212,16 +189,7 @@ const PricingAdmin = () => {
 		}
 		try {
 			setIsLoading(true);
-			const response = await fetch(`${API}/api/account-types`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(values),
-			});
-      
-			if (!response.ok) {
-				const errorData = await response.json();
-				throw new Error(errorData.error || 'Failed to create account type');
-			}
+			await http.post('/account-types', values);
       
 			await fetchAccountTypes();
 			table.setCreatingRow(null);
@@ -242,11 +210,7 @@ const PricingAdmin = () => {
 		}
 		try {
 			setIsLoading(true);
-			await fetch(`${API}/api/account-types/${row.original.account_type_id}`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(updatedAccountType),
-			});
+			await http.put(`/account-types/${row.original.account_type_id}`, updatedAccountType);
 			await fetchAccountTypes();
 			exitEditingMode();
 			setValidationErrors({});
@@ -261,9 +225,7 @@ const PricingAdmin = () => {
 		if (window.confirm(`Are you sure you want to delete account type ${row.account_type_name}?`)) {
 			try {
 				setIsLoading(true);
-				await fetch(`${API}/api/account-types/${row.account_type_id}`, {
-					method: 'DELETE',
-				});
+				await http.delete(`/account-types/${row.account_type_id}`);
 				await fetchAccountTypes();
 			} catch (err) {
 				console.error('Delete failed', err);
@@ -673,16 +635,7 @@ const PricingAdmin = () => {
 					}}
 					onSave={async (pricing) => {
 						try {
-							const response = await fetch(`${API}/api/product-pricing`, {
-								method: 'POST',
-								headers: { 'Content-Type': 'application/json' },
-								body: JSON.stringify(pricing),
-							});
-              
-							if (!response.ok) {
-								const errorData = await response.json();
-								throw new Error(errorData.error || 'Failed to save pricing');
-							}
+							await http.post('/product-pricing', pricing);
               
 							await fetchPricing();
 							setAddPricingModalOpen(false);
@@ -704,11 +657,7 @@ const PricingAdmin = () => {
 					pricingData={currentPricing}
 					onClose={() => setEditPricingModalOpen(false)}
 					onSave={async (updatedPricing) => {
-						await fetch(`${API}/api/product-pricing/${updatedPricing.pricing_id}`, {
-							method: 'PUT',
-							headers: { 'Content-Type': 'application/json' },
-							body: JSON.stringify(updatedPricing),
-						});
+						await http.put(`/product-pricing/${updatedPricing.pricing_id}`, updatedPricing);
 						await fetchPricing();
 						setEditPricingModalOpen(false);
 					}}

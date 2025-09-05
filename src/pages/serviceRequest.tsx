@@ -17,7 +17,7 @@ import { useParams } from 'react-router-dom';
 import TopAppBar from '../navBars/topAppBar';
 import App from '../App';
 import { useNavAccess } from '../navBars/navBars';
-import API from '../apiConfig';
+import { http } from '../lib/http';
 
 type ServiceRequest = {
   id: string;
@@ -64,9 +64,8 @@ const ServiceRequestTable = () => {
 	const fetchData = async () => {
 		try {
 			setIsLoading(true);
-			const res = await fetch(`${API}/api/service-requests`);
-			if (!res.ok) throw new Error('Fetch error');
-			const data = await res.json();
+			const res = await http.get('/service-requests');
+			const data = res.data;
 			setRequests(id ? data.filter((r: ServiceRequest) => String(r.id) === String(id)) : data);
 			setIsError(false);
 		} catch (err) {
@@ -78,8 +77,8 @@ const ServiceRequestTable = () => {
 	};
 
 	const fetchDealers = async () => {
-		const res = await fetch(`${API}/api/dealers`);
-		const data = await res.json();
+		const res = await http.get('/dealers');
+		const data = res.data;
 		const map: Record<string, Dealer> = {};
 		data.forEach((d: Dealer) => {
 			map[d.dealer_id] = d;
@@ -88,8 +87,8 @@ const ServiceRequestTable = () => {
 	};
 
 	const fetchOrders = async () => {
-		const res = await fetch(`${API}/api/orders-basic`);
-		const data = await res.json();
+		const res = await http.get('/orders-basic');
+		const data = res.data;
 		const map: Record<string, OrderOption> = {};
 		data.forEach((o: OrderOption) => {
 			map[o.order_id] = o;
@@ -115,13 +114,8 @@ const ServiceRequestTable = () => {
 		};
 
 		try {
-			const response = await fetch(`${API}/api/service-requests`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(payload),
-			});
+			await http.post('/service-requests', payload);
 
-			if (!response.ok) throw new Error('Failed to create record');
 			await fetchOrders();
 			await fetchDealers();
 			await fetchData();
@@ -134,13 +128,7 @@ const ServiceRequestTable = () => {
 	const handleUpdate = async (values: ServiceRequest) => {
 		console.log("Updating service request:", values);
 		try {
-			const response = await fetch(`${API}/api/service-requests/${values.id}`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(values),
-			});
-
-			if (!response.ok) throw new Error('Update failed');
+			await http.put(`/service-requests/${values.id}`, values);
 			await fetchData();
 		} catch (err) {
 			console.error('Error updating service request:', err);
@@ -156,11 +144,7 @@ const ServiceRequestTable = () => {
 		const formData = new FormData();
 		formData.append('file', file);
 		try {
-			const res = await fetch(`${API}/api/service-requests/${serviceRequestId}/attachment`, {
-				method: 'POST',
-				body: formData,
-			});
-			if (!res.ok) throw new Error('Upload failed');
+			await http.post(`/service-requests/${serviceRequestId}/attachment`, formData);
 			await fetchData();
 		} catch (err) {
 			console.error('Error uploading attachment:', err);
@@ -233,7 +217,7 @@ const ServiceRequestTable = () => {
 					/>
 					{row.original.filename && (
 						<a
-							href={`${API}/uploads/lr-receipts/${row.original.file_path}`}
+							href={`/uploads/lr-receipts/${row.original.file_path}`}
 							target="_blank"
 							rel="noopener noreferrer"
 						>

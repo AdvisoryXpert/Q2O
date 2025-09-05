@@ -4,6 +4,7 @@ const router = express.Router();
 module.exports = (db) => {
   router.get('/:quote_id', (req, res) => {
     const quoteId = req.params.quote_id;
+    const tenant_id = req.tenant_id;
 
     const query = `
       SELECT 
@@ -18,21 +19,21 @@ module.exports = (db) => {
       FROM ro_cpq.quotationitems qi
       JOIN ro_cpq.product p ON qi.product_id = p.product_id
       JOIN ro_cpq.product_attribute pa ON qi.product_attribute_id = pa.attribute_id
-      WHERE qi.quote_id = ?;
+      WHERE qi.quote_id = ? AND qi.tenant_id = ?;
     `;
 
     const noteQuery = `
-      SELECT note FROM ro_cpq.notes WHERE quote_id = ? LIMIT 1;
+      SELECT note FROM ro_cpq.notes WHERE quote_id = ? AND tenant_id = ? LIMIT 1;
     `;
 
-    db.query(query, [quoteId], (err, items) => {
+    db.query(query, [quoteId, tenant_id], (err, items) => {
       if (err) {
         return res.status(500).json({ error: 'Data fetch failed', details: err });
       }
 
       const totalSum = items.reduce((sum, item) => sum + item.total_price, 0);
 
-      db.query(noteQuery, [quoteId], (noteErr, noteResult) => {
+      db.query(noteQuery, [quoteId, tenant_id], (noteErr, noteResult) => {
         const note = !noteErr && noteResult.length > 0 ? noteResult[0].note : '';
         res.json({ items, totalSum, note });
       });

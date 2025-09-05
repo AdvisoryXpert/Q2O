@@ -1,17 +1,18 @@
-// routes/createFollowup.js
+// routes/CreateFollowup.js
 const db = require('../db');
 
-function createFollowup(entity_type, entity_id, assigned_to, created_by, due_date = null, notes = null) {
+// BREAKING (small): add tenant_id param as the first arg
+function createFollowup(tenant_id, entity_type, entity_id, assigned_to, created_by, due_date = null, notes = null) {
   const followup_id = `FU-${Date.now()}`;
   const sql = `
-    INSERT INTO follow_ups
-    (followup_id, entity_type, entity_id, assigned_to, created_by, due_date, notes)
-    VALUES (?, ?, ?, ?, ?, NOW(), ?)
+    INSERT INTO ro_cpq.follow_ups
+      (tenant_id, followup_id, entity_type, entity_id, assigned_to, created_by, due_date, notes)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
   db.query(
     sql,
-    [followup_id, entity_type, entity_id, assigned_to, created_by, due_date, notes],
+    [tenant_id, followup_id, entity_type, entity_id, assigned_to, created_by, due_date, notes],
     (err) => {
       if (err) {
         console.error('❌ Error creating follow-up:', err);

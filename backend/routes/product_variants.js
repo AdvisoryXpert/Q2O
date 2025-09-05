@@ -4,6 +4,7 @@ const router = express.Router();
 module.exports = (db) => {
   router.get('/', (req, res) => {
     const showAll = req.query.all === 'true';
+    const tenant_id = req.tenant_id;
 
     const baseQuery = `
       SELECT 
@@ -15,11 +16,12 @@ module.exports = (db) => {
       FROM ro_cpq.product_attribute pa
       JOIN ro_cpq.product p ON pa.product_id = p.product_id
       JOIN ro_cpq.product_pricing prc ON prc.attribute_id = pa.attribute_id
+      WHERE pa.tenant_id = ?
       ORDER BY pa.product_id
     `;
 
     if (showAll) {
-      db.query(baseQuery, (err, rows) => {
+      db.query(baseQuery, [tenant_id], (err, rows) => {
         if (err) return res.status(500).json({ error: 'Data fetch failed' });
 
         const productMap = {};
@@ -50,16 +52,17 @@ module.exports = (db) => {
         SELECT COUNT(DISTINCT pa.product_id) AS total
         FROM ro_cpq.product_attribute pa
         JOIN ro_cpq.product p ON pa.product_id = p.product_id
+        WHERE pa.tenant_id = ?
       `;
 
       const dataQuery = `${baseQuery} LIMIT ? OFFSET ?`;
 
-      db.query(countQuery, (err, countResult) => {
+      db.query(countQuery, [tenant_id], (err, countResult) => {
         if (err) return res.status(500).json({ error: 'Count failed' });
         const total = countResult[0].total;
         const totalPages = Math.ceil(total / limit);
 
-        db.query(dataQuery, [limit, offset], (err, rows) => {
+        db.query(dataQuery, [tenant_id, limit, offset], (err, rows) => {
           if (err) return res.status(500).json({ error: 'Data fetch failed' });
 
           const productMap = {};

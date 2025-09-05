@@ -3,6 +3,7 @@ const router = express.Router();
 
 module.exports = (db) => {
   router.get('/', (req, res) => {
+    const tenant_id = req.tenant_id;
     const query = `
       SELECT 
       pa.product_id,
@@ -12,10 +13,11 @@ module.exports = (db) => {
       prc.price
       FROM ro_cpq.product_attribute pa
       JOIN ro_cpq.product p ON pa.product_id = p.product_id
-      JOIN ro_cpq.product_pricing prc ON prc.attribute_id = pa.attribute_id;
+      JOIN ro_cpq.product_pricing prc ON prc.attribute_id = pa.attribute_id
+      WHERE pa.tenant_id = ?;
       `;
 
-    db.query(query, (err, rows) => {
+    db.query(query, [tenant_id], (err, rows) => {
       if (err) {
         console.error("Error fetching product attributes:", err);
         return res.status(500).json({ error: "Database error" });
@@ -61,13 +63,14 @@ module.exports = (db) => {
   // GET /api/attributes - fetch all attributes
 router.get('/attr', (req, res) => {
   const { attribute_id } = req.query;
+  const tenant_id = req.tenant_id;
 
   if (!attribute_id) {
     return res.status(400).json({ error: 'attribute_id is required' });
   }
 
-  const sql = `SELECT * FROM ro_cpq.product_attribute WHERE attribute_id = ?`;
-  const params = [Number(attribute_id)];
+  const sql = `SELECT * FROM ro_cpq.product_attribute WHERE attribute_id = ? AND tenant_id = ?`;
+  const params = [Number(attribute_id), tenant_id];
 
   console.log('SQL:', sql, 'Params:', params);
 

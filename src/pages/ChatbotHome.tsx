@@ -13,9 +13,9 @@ import ReminderSection from '../components/reminders';
 import { useNavAccess } from '../navBars/navBars';
 import App from '../App';
 import QuotationList from './QuotationPage';
-import axios from 'axios';
+import { http } from '../lib/http';
 import { useNavigate } from 'react-router-dom';
-import API from '../apiConfig'; 
+import { isAuthenticated } from '../services/AuthService'; // NEW IMPORT
 import {
 	ResponsiveContainer,
 	BarChart,
@@ -37,14 +37,19 @@ const ChatbotHome: React.FC = () => {
 	const [orderStats, setOrderStats] = useState<{ date: string; orders: number }[]>([]);
 
 	useEffect(() => {
-		axios.get(`${API}/api/quote-status-count`)
+		if (!isAuthenticated()) { // NEW CHECK
+			console.warn("Not authenticated. Skipping quote status fetch.");
+			setOrderStats([]); // Clear any previous stats
+			return;
+		}
+		http.get('/quote-status-count')
 			.then(response => {
 				setOrderStats(response.data);
 			})
 			.catch(error => {
 				console.error('Error fetching order stats:', error);
 			});
-	}, []);
+	}, [isAuthenticated]);
 
 	const handleSearch = () => {
 		if (!serialNumber.trim()) return;

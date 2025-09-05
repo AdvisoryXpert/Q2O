@@ -21,6 +21,7 @@ import TopAppBar from '../navBars/topAppBar';
 import App from '../App';
 import { useNavAccess } from '../navBars/navBars';
 import RoleAccessSubview from './roleAccesssubview';
+import { http } from '../lib/http';
 
 /** Types */
 type User = {
@@ -33,7 +34,6 @@ type User = {
 	two_fa_enabled: boolean;
 	can_regenerate_2fa: boolean;
 };
-import API from '../apiConfig'; 
 const availableRoles = ['Admin', 'Employee', 'Customer'];
 
 const UserManagementTable = () => {
@@ -55,9 +55,8 @@ const UserManagementTable = () => {
 	const fetchData = async () => {
 		try {
 			setIsLoading(true);
-			const res = await fetch(`${API}/api/userMgmt/usersList`);
-			if (!res.ok) throw new Error('Network response was not ok');
-			const data = await res.json();
+			const res = await http.get('/userMgmt/usersList');
+			const data = res.data;
 			const normalizedUsers = data.map((user: any) => ({
 				...user,
 				id: user.user_id?.toString() ?? user.id?.toString(),
@@ -80,8 +79,8 @@ const UserManagementTable = () => {
 
 	const fetchRoleIcons = async (role: string) => {
 		try {
-			const response = await fetch(`${API}/api/userMgmt/role-icons?role=${role}`);
-			const data = await response.json();
+			const response = await http.get(`/userMgmt/role-icons?role=${role}`);
+			const data = response.data;
 			setIcons(data);
 		} catch (error) {
 			console.error('Error fetching icons:', error);
@@ -133,14 +132,10 @@ const UserManagementTable = () => {
 			can_regenerate_2fa: canRegenerate2FA,
 		};
 		const url = editingUser ? 'updateUser' : 'CreateUser';
-		const method = editingUser ? 'PUT' : 'POST';
+		const method = editingUser ? 'put' : 'post';
 
 		try {
-			await fetch(`${API}/api/userMgmt/${url}`, {
-				method,
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(payload),
-			});
+			await http[method](`/userMgmt/${url}`, payload);
 			await fetchData();
 			setOpenDialog(false);
 		} catch (error) {
@@ -165,11 +160,11 @@ const UserManagementTable = () => {
 					setSelectedIcons([]);
 					try {
 						const [iconsRes, accessRes] = await Promise.all([
-							fetch(`${API}/api/userMgmt/role-icons?role=${row.original.role}`),
-							fetch(`${API}/api/userMgmt/user-access?user_id=${row.original.id}`),
+							http.get(`/userMgmt/role-icons?role=${row.original.role}`),
+							http.get(`/userMgmt/user-access?user_id=${row.original.id}`),
 						]);
-						const roleIcons = await iconsRes.json();
-						const userAccessIcons = await accessRes.json();
+						const roleIcons = iconsRes.data;
+						const userAccessIcons = accessRes.data;
 						setIcons(roleIcons);
 						setTimeout(() => {
 							setSelectedIcons(userAccessIcons);
@@ -196,9 +191,8 @@ const UserManagementTable = () => {
 					size="small"
 					onClick={async () => {
 						try {
-							const response = await 
-							fetch(`${API}/api/userMgmt/user-access?user_id=${row.original.id}`);
-							const data = await response.json();
+							const response = await http.get(`/userMgmt/user-access?user_id=${row.original.id}`);
+							const data = response.data;
 							alert(`Access icons: ${data.join(', ')}`);
 						} catch (err) {
 							console.error('Failed to fetch access icons:', err);

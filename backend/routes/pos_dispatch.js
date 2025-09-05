@@ -5,12 +5,13 @@ const db = require('../db');
 // Get POS order dispatch info
 router.get('/:order_id', (req, res) => {
   const { order_id } = req.params;
+  const tenant_id = req.tenant_id;
 
   const orderQuery = `
     SELECT o.order_id, o.total_price, o.status, o.date_created, d.full_name AS dealer_name
     FROM ro_cpq.orders o
     LEFT JOIN ro_cpq.dealer d ON o.dealer_id = d.dealer_id
-    WHERE o.order_id = ?
+    WHERE o.order_id = ? AND o.tenant_id = ?
   `;
 
   const lineItemQuery = `
@@ -25,17 +26,17 @@ router.get('/:order_id', (req, res) => {
     FROM ro_cpq.order_line ol
     LEFT JOIN ro_cpq.product p ON ol.product_id = p.product_id
     LEFT JOIN ro_cpq.product_attribute pa ON ol.product_attribute_id = pa.attribute_id
-    WHERE ol.order_id = ?
+    WHERE ol.order_id = ? AND ol.tenant_id = ?
   `;
 
-  db.query(orderQuery, [order_id], (err, orderResult) => {
+  db.query(orderQuery, [order_id, tenant_id], (err, orderResult) => {
     if (err || orderResult.length === 0) {
       return res.status(404).json({ error: 'Order not found' });
     }
 
     const order = orderResult[0];
 
-    db.query(lineItemQuery, [order_id], (err, lineResults) => {
+    db.query(lineItemQuery, [order_id, tenant_id], (err, lineResults) => {
       if (err) {
         return res.status(500).json({ error: 'Failed to fetch order line items' });
       }

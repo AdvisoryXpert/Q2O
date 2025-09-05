@@ -13,7 +13,8 @@ import TopAppBar from "../navBars/topAppBar";
 import App from "../App";
 import { useNavAccess } from "../navBars/navBars";
 import { useSearchParams } from 'react-router-dom'; // ✅ Added this
-import API from '../apiConfig'; 
+
+import { http } from '../lib/http';
 type Warranty = {
   warranty_id: number;
   serial_number: string;
@@ -38,9 +39,8 @@ const WarrantyTablePage = () => {
 	const navItems = useNavAccess();
 
 	const fetchWarranties = async () => {
-		const res = await fetch(`${API}/api/warranty`);
-		const data = await res.json();
-		setWarranties(data);
+		const res = await http.get('/warranty');
+		setWarranties(res.data);
 	};
 
 	useEffect(() => {
@@ -56,12 +56,8 @@ const WarrantyTablePage = () => {
 
 	const handleStatusUpdate = async (warranty_id: number) => {
 		try {
-			const res = await fetch(`${API}/api/warranty/${warranty_id}`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ status: statusDraft })
-			});
-			if (res.ok) {
+			const res = await http.put(`/warranty/${warranty_id}`, { status: statusDraft });
+			if (res.status === 200) { // Axios uses status, not res.ok
 				setEditingRowId(null);
 				fetchWarranties();
 			}

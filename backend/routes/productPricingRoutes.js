@@ -5,6 +5,7 @@ const db = require('../db');
 // GET: Fetch pricing records with joins
 router.get('/', (req, res) => {
   const { attribute_id, condition_id, product_id } = req.query;
+  const tenant_id = req.tenant_id;
 
   db.query(
     `SELECT 
@@ -17,11 +18,13 @@ router.get('/', (req, res) => {
      JOIN ro_cpq.product pr ON pa.product_id = pr.product_id
      WHERE (? IS NULL OR ppr.attribute_id = ?)
        AND (? IS NULL OR pr.condition_id = ?)
-       AND (? IS NULL OR pr.product_id = ?)`,
+       AND (? IS NULL OR pr.product_id = ?)
+       AND ppr.tenant_id = ?`,
     [
       attribute_id || null, attribute_id || null,
       condition_id || null, condition_id || null,
-      product_id || null, product_id || null
+      product_id || null, product_id || null,
+      tenant_id
     ],
     (err, results) => {
       if (err) {
@@ -35,6 +38,7 @@ router.get('/', (req, res) => {
 
 router.post('/', async (req, res) => {
   const { attribute_id, min_quantity, cost_price, price } = req.body;
+  const tenant_id = req.tenant_id;
 
   // 1. Input validation
   if (!attribute_id || min_quantity == null || price == null || cost_price == null) {
@@ -50,8 +54,8 @@ router.post('/', async (req, res) => {
       `SELECT pa.attribute_id, pa.product_id, p.condition_id
        FROM ro_cpq.product_attribute pa
        LEFT JOIN ro_cpq.product p ON pa.product_id = p.product_id
-       WHERE pa.attribute_id = ?`,
-      [attribute_id],
+       WHERE pa.attribute_id = ? AND pa.tenant_id = ?`,
+      [attribute_id, tenant_id],
       (err, attributeResults) => {
         if (err) {
           console.error('Attribute query failed', err);
@@ -67,8 +71,8 @@ router.post('/', async (req, res) => {
         // 3. Check for existing pricing
         db.query(
           `SELECT 1 FROM ro_cpq.product_pricing
-           WHERE attribute_id = ?`,
-          [attribute_id],
+           WHERE attribute_id = ? AND tenant_id = ?`,
+          [attribute_id, tenant_id],
           (err, existingResults) => {
             if (err) {
               console.error('Existing pricing check failed', err);
@@ -86,9 +90,9 @@ router.post('/', async (req, res) => {
             // 4. Create new pricing record
             db.query(
               `INSERT INTO ro_cpq.product_pricing 
-               (attribute_id, min_quantity, cost_price, price)
-               VALUES (?, ?, ?, ?)`,
-              [attribute_id, min_quantity, cost_price, price],
+               (attribute_id, min_quantity, cost_price, price, tenant_id)
+               VALUES (?, ?, ?, ?, ?)`,
+              [attribute_id, min_quantity, cost_price, price, tenant_id],
               (err, result) => {
                 if (err) {
                   console.error('Create pricing failed', err);
@@ -122,6 +126,7 @@ router.post('/', async (req, res) => {
 router.put('/:pricing_id', (req, res) => {
   const { pricing_id } = req.params;
   const { min_quantity, cost_price, price } = req.body;
+  const tenant_id = req.tenant_id;
 
   if (!pricing_id) {
     return res.status(400).json({ error: 'Missing pricing_id' });
@@ -132,8 +137,8 @@ router.put('/:pricing_id', (req, res) => {
      SET min_quantity = ?,
          cost_price = ?,
          price = ?
-     WHERE pricing_id = ?`,
-    [min_quantity, cost_price, price, pricing_id],
+     WHERE pricing_id = ? AND tenant_id = ?`,
+    [min_quantity, cost_price, price, pricing_id, tenant_id],
     (err, result) => {
       if (err) {
         console.error('PUT pricing failed', err);
@@ -147,14 +152,15 @@ router.put('/:pricing_id', (req, res) => {
 // DELETE: Remove pricing record
 router.delete('/:pricing_id', (req, res) => {
   const { pricing_id } = req.params;
+  const tenant_id = req.tenant_id;
 
   if (!pricing_id) {
     return res.status(400).json({ error: 'Missing pricing_id' });
   }
 
   db.query(
-    `DELETE FROM ro_cpq.product_pricing WHERE pricing_id = ?`,
-    [pricing_id],
+    `DELETE FROM ro_cpq.product_pricing WHERE pricing_id = ? AND tenant_id = ?`,
+    [pricing_id, tenant_id],
     (err, result) => {
       if (err) {
         console.error('DELETE pricing failed', err);

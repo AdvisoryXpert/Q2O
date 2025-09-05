@@ -15,15 +15,14 @@ module.exports = (db) => {
         return res.status(500).json({ error: 'Database connection failed' });
       }
 
-      connection.beginTransaction(async (err) => {
-        if (err) {
-          connection.release();
-          return res.status(500).json({ error: 'Failed to start transaction' });
-        }
+      connection.beginTransaction((err) => {
+        if (err) { connection.release(); return res.status(500).json({ error: 'Failed to start transaction' }); }
 
+        // INSERT quotation (stamp tenant)
         connection.query(
-          `INSERT INTO ro_cpq.quotation (dealer_id, user_id, total_price) VALUES (?, ?, ?)`,
-          [dealer.dealer_id, user_id, total_price],
+          `INSERT INTO ro_cpq.quotation (tenant_id, dealer_id, user_id, total_price)
+           VALUES (?, ?, ?, ?)`,
+          [req.tenant_id, dealer.dealer_id, user_id, total_price],
           (err, quoteResult) => {
             if (err) {
               return connection.rollback(() => {
@@ -35,41 +34,32 @@ module.exports = (db) => {
 
             const quote_id = quoteResult.insertId;
 
-            // Insert all quotation items
-            const itemQueries = cartItems.map(item => {
-              return new Promise((resolve, reject) => {
-                connection.query(
-                  `INSERT INTO ro_cpq.quotationitems 
-                  (quote_id, product_id, product_attribute_id, quantity, unit_price,is_selected)
-                  VALUES (?, ?, ?, ?, ?,'1')`,
-                  [quote_id, item.product_id, item.product_attribute_id, item.quantity, item.unit_price,item.is_selected],
-                  (err) => {
-                    if (err) reject(err);
-                    else resolve();
-                  }
-                );
-              });
-            });
+            // Insert all quotation items (stamp tenant)
+            const itemQueries = cartItems.map(item => new Promise((resolve, reject) => {
+              connection.query(
+                `INSERT INTO ro_cpq.quotationitems 
+                   (tenant_id, quote_id, product_id, product_attribute_id, quantity, unit_price, is_selected)
+                 VALUES (?, ?, ?, ?, ?, ?, '1')`,
+                [req.tenant_id, quote_id, item.product_id, item.product_attribute_id, item.quantity, item.unit_price],
+                (err) => err ? reject(err) : resolve()
+              );
+            }));
+
+            // Create followup (now requires tenant_id as first arg)
             const createFollowup = require('./CreateFollowup');
-            createFollowup('quote', quote_id, user_id, user_id);
+            createFollowup(req.tenant_id, 'quote', quote_id, user_id, user_id);
 
-            // Optional: Insert note
-            const insertNote = () => {
-              return new Promise((resolve, reject) => {
-                if (!note || note.trim() === '') return resolve();
-                connection.query(
-                  `INSERT INTO ro_cpq.notes (quote_id, content, created_by, created_at)
-                   VALUES (?, ?, ?, NOW())`,
-                  [quote_id, note.trim(), user_id],
-                  (err) => {
-                    if (err) reject(err);
-                    else resolve();
-                  }
-                );
-              });
-            };
+            // Optional note (stamp tenant if your notes table is tenantized)
+            const insertNote = () => new Promise((resolve, reject) => {
+              if (!note || note.trim() === '') return resolve();
+              connection.query(
+                `INSERT INTO ro_cpq.notes (tenant_id, quote_id, content, created_by, created_at)
+                 VALUES (?, ?, ?, ?, NOW())`,
+                [req.tenant_id, quote_id, note.trim(), user_id],
+                (err) => err ? reject(err) : resolve()
+              );
+            });
 
-            // Run all inserts
             Promise.all([...itemQueries, insertNote()])
               .then(() => {
                 connection.commit((err) => {
@@ -79,7 +69,6 @@ module.exports = (db) => {
                       res.status(500).json({ error: 'Commit failed' });
                     });
                   }
-
                   connection.release();
                   res.json({ success: true, quote_id });
                 });

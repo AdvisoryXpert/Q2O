@@ -11,7 +11,7 @@ import {
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useParams, useNavigate } from 'react-router-dom';
 import { BarcodeScanner, CameraOCRScanner } from '../utils/scanner_ocr';
-import API from '../apiConfig'; 
+import { http } from '../lib/http'; 
 import { getUserId } from '../services/AuthService'; 
 type DispatchItem = {
   order_line_id: number;
@@ -37,8 +37,8 @@ const OrderDetailPage = () => {
 
 	useEffect(() => {
 		const fetchDispatchItems = async () => {
-			const res = await fetch(`${API}/api/dipatch_mob/${orderId}`);
-			const data = await res.json();
+			const res = await http.get(`/dipatch_mob/${orderId}`);
+			const data = res.data;
 
 			// Extract dealer info from the parent object (not from line items)
 			const dealer_id = data.dealer_id;
@@ -67,25 +67,21 @@ const OrderDetailPage = () => {
 	const handleSaveAndDispatch = async () => {
 		const userId = (await getUserId()) || '1';
 		try {
-			const response = await fetch(`${API}/api/warranty/`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					order_id: orderId,
-					dispatch_items: dispatchItems.map(item => ({
-						order_line_id: item.order_line_id,
-						serial_number: item.serial_number,
-						product_id: item.product_id,
-						product_attribute_id: item.product_attribute_id,
-						dealer_id: item.dealer_id,
-						customer_name: item.dealer_name, // ✅ use dealer name
-						user_id: userId
-					}))
-				})
+			const response = await http.post('/warranty/', {
+				order_id: orderId,
+				dispatch_items: dispatchItems.map(item => ({
+					order_line_id: item.order_line_id,
+					serial_number: item.serial_number,
+					product_id: item.product_id,
+					product_attribute_id: item.product_attribute_id,
+					dealer_id: item.dealer_id,
+					customer_name: item.dealer_name, // ✅ use dealer name
+					user_id: userId
+				}))
 			});
 
-			const result = await response.json();
-			if (!response.ok) throw new Error(result?.error || 'Dispatch failed');
+			const result = response.data;
+			if (response.status !== 200) throw new Error(result?.error || 'Dispatch failed');
 			alert('✅ Order dispatched and warranties created successfully!');
 		} catch (err: any) {
 			console.error('Dispatch Error:', err);

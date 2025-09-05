@@ -1,5 +1,5 @@
 const express = require('express');
-const router = express.Router();
+const router = express.Router();;
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -36,13 +36,14 @@ const upload = multer({
 // Upload or update attachment for LR Receipt
 router.put('/:id/attachment', upload.single('file'), (req, res) => {
   const { id } = req.params;
+  const tenant_id = req.tenant_id;
 
   if (!req.file) {
     return res.status(400).json({ error: 'No file uploaded' });
   }
 
   // Step 1: Check if the record exists
-  db.query('SELECT file_path FROM lr_receipts WHERE id = ?', [id], (err, result) => {
+  db.query('SELECT file_path FROM lr_receipts WHERE id = ? AND tenant_id = ?', [id, tenant_id], (err, result) => {
     if (err) {
       console.error('DB Error:', err);
       fs.unlinkSync(req.file.path); // cleanup
@@ -66,8 +67,8 @@ router.put('/:id/attachment', upload.single('file'), (req, res) => {
 
     // Step 3: Update the database with new file path
     db.query(
-      'UPDATE lr_receipts SET file_path = ? WHERE id = ?',
-      [req.file.filename, id],
+      'UPDATE lr_receipts SET file_path = ? WHERE id = ? AND tenant_id = ?',
+      [req.file.filename, id, tenant_id],
       (err) => {
         if (err) {
           console.error('Update Error:', err);

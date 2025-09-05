@@ -8,7 +8,8 @@ router.get('/test', (req, res) => {
 
 // Get recent orders
 router.get('/', (req, res) => {
-    db.query('SELECT * FROM orders order by date_created desc', (err, results) => {
+    const tenant_id = req.tenant_id;
+    db.query('SELECT * FROM orders WHERE tenant_id = ? order by date_created desc', [tenant_id], (err, results) => {
       if (err) {
         console.error('DB Error:', err);
         return res.status(500).json({ error: 'Database error' });
@@ -20,8 +21,9 @@ router.get('/', (req, res) => {
   // Get a specific order by orderId
 router.get('/:orderId', (req, res) => {
   const orderId = req.params.orderId;
+  const tenant_id = req.tenant_id;
 
-  db.query('SELECT * FROM orders WHERE order_id = ?', [orderId], (err, results) => {
+  db.query('SELECT * FROM orders WHERE order_id = ? AND tenant_id = ?', [orderId, tenant_id], (err, results) => {
     if (err) {
       console.error('DB Error:', err);
       return res.status(500).json({ error: 'Database error' });

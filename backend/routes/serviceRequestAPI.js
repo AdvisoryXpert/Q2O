@@ -6,7 +6,8 @@ const createFollowup = require('./CreateFollowup');
 
 // ✅ GET all service requests
 router.get('/', (req, res) => {
-  db.query('SELECT * FROM service_requests', (err, results) => {
+  const tenant_id = req.tenant_id;
+  db.query('SELECT * FROM service_requests WHERE tenant_id = ?', [tenant_id], (err, results) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(results);
   });
@@ -21,20 +22,21 @@ router.post('/', (req, res) => {
   dealer_id,
   user_id
 } = req.body;
+const tenant_id = req.tenant_id;
 
 const sql = `
   INSERT INTO service_requests
-  (order_id, invoice_id, status, dealer_id, user_id)
-  VALUES (?, ?, ?, ?, ?)
+  (order_id, invoice_id, status, dealer_id, user_id, tenant_id)
+  VALUES (?, ?, ?, ?, ?, ?)
 `;
 db.query(
   sql,
-  [order_id, invoice_id, status, dealer_id, user_id],
+  [order_id, invoice_id, status, dealer_id, user_id, tenant_id],
   (err, result) => {
     if (err) return res.status(500).json({ error: err.message });
 
     // ✅ Create a follow-up for the new service request
-    createFollowup('sr', result.insertId, user_id, user_id);
+    createFollowup('sr', result.insertId, user_id, user_id, null, null, tenant_id);
 
     res.status(201).json({ message: 'Request created', id: result.insertId });
   }
@@ -52,16 +54,17 @@ router.put('/:id', (req, res) => {
     user_id,
     notes
   } = req.body;
+  const tenant_id = req.tenant_id;
 
   const sql = `
     UPDATE service_requests
     SET order_id = ?, invoice_id = ?, status = ?, dealer_id = ?, user_id = ?,notes = ?
-    WHERE id = ?
+    WHERE id = ? AND tenant_id = ?
   `;
 
   db.query(
     sql,
-    [order_id, invoice_id, status, dealer_id, user_id,notes || null, id],
+    [order_id, invoice_id, status, dealer_id, user_id,notes || null, id, tenant_id],
     (err, result) => {
       if (err) return res.status(500).json({ error: err.message });
       res.json({ message: 'Request updated' });

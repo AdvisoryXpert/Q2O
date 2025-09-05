@@ -1,8 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
 import "../style/Login.css";
-import API from '../apiConfig';
+import { http } from '../lib/http';
 
 const Login: React.FC = () => {
 	const [mobile, setMobile] = useState("");
@@ -13,7 +12,7 @@ const Login: React.FC = () => {
 	const handleLogin = async (e: React.FormEvent) => {
 		e.preventDefault();
 		try {
-			const response = await axios.post(`${API}/api/login`, {
+			const response = await http.post('/login', {
 				mobile,
 				password,
 			  }, {

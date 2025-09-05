@@ -1,10 +1,7 @@
 import { useState, useRef, useEffect } from "react";
-import { getUserId } from "./services/AuthService";
-import { saveDealerAndQuotation } from "./api/api";
+import { getUserId, isAuthenticated } from "./services/AuthService";
+import { http } from './lib/http';
 import ChatBot from "./components/ChatBot";
-import { Flow } from "./types/Flow";
-import { Params } from "./types/Params";
-import API from './apiConfig'; 
 
 type DealerData = {
   full_name: string;
@@ -54,30 +51,51 @@ function App() {
 		return input?.trim() || "";
 	};
 
+	const createQuotation = async (dealerData: any, total_price: number, product_id: number, user_id: number) => {
+		try {
+			const payload = {
+				...dealerData,
+				tds_level: parseInt(dealerData.tds_level, 10),
+				hardness_level: parseInt(dealerData.hardness_level, 10),
+				total_price,
+				product_id,
+				user_id
+			};
+
+			const { data } = await http.post('/dealer-quotation', payload);
+
+			return data.quote_id;
+		} catch (error: any) {
+			console.error("Error saving dealer, quotation & item:", error.response?.data || error.message);
+			throw error; // Re-throw to be caught by the calling function
+		}
+	};
+
 	// Fetch account types
 	useEffect(() => {
 		const fetchAccountTypes = async () => {
+			if (!isAuthenticated()) { // Check if authenticated
+				console.warn("Not authenticated. Skipping account types fetch.");
+				return;
+			}
 			try {
-				const response = await fetch(`${API}/api/account-types`);
-				const data = await response.json();
+				const { data } = await http.get('/account-types');
 				const accountTypeNames = data.map((type: any) => type.account_type_name);
 				setAccountTypes(accountTypeNames);
-			} catch (err) {
-				console.error("Error fetching account types:", err);
+			} catch (err) {				console.error("Error fetching account types:", err);
 			}
 		};
 		fetchAccountTypes();
-	}, []);
+	}, [isAuthenticated]);
 
 	// Fetch existing dealer ID from previous quotes
 	useEffect(() => {
 		if (state.dealerData.phone && state.dealerData.phone.length >= 10) {
 			const fetchDealerId = async () => {
 				try {
-					const response = await fetch(
-						`${API}/api/quotes/by-phone/${state.dealerData.phone}`
+					const { data: quotes } = await http.get(
+						`/quotes/by-phone/${state.dealerData.phone}`
 					);
-					const quotes = await response.json();
 					if (quotes.length > 0 && quotes[0].dealer_id) {
 						setStatus(prev => ({ ...prev, existingDealerId: quotes[0].dealer_id }));
 					} else {
@@ -181,9 +199,7 @@ function App() {
 		check_existing_quotes: {
 			message: async () => {
 				try {
-					const dealerRes = await 
-					fetch(`${API}/api/dealers/by-phone/${state.dealerData.phone}`);
-					const dealers = await dealerRes.json();
+					const { data: dealers } = await http.get(`/dealers/by-phone/${state.dealerData.phone}`);
 					const dealer = dealers[0]; 
 
 					if (!dealer || !dealer.dealer_id) {
@@ -195,8 +211,7 @@ function App() {
 					setStatus(prev => ({ ...prev, existingDealerId: dealer.dealer_id }));
 
 					// 🟡 Step 2: Check if dealer has existing quotes
-					const quoteRes = await fetch(`${API}/api/quotes/by-phone/${state.dealerData.phone}`);
-					const quotes = await quoteRes.json();
+					const { data: quotes } = await http.get(`/quotes/by-phone/${state.dealerData.phone}`);
 
 					if (quotes.length === 0) {
 						return `Dealer found, but no quotes exist. 
@@ -282,7 +297,7 @@ function App() {
 					const product_id = 101;
 					const user_id = parseInt((await getUserId()) || "1");
 
-					const quote_id = await saveDealerAndQuotation(
+					const quote_id = await createQuotation(
 						dealerPayload,
 						total_price,
 						product_id,

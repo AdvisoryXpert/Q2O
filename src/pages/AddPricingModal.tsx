@@ -11,7 +11,7 @@ import {
 	Box,
 	Alert
 } from '@mui/material';
-import API from '../apiConfig';
+import { http } from '../lib/http';
 
 type Props = {
   open: boolean;
@@ -58,8 +58,8 @@ const AddPricingModal: React.FC<Props> = ({ open, onClose, onSave }) => {
 
 	const fetchConditions = async () => {
 		try {
-			const res = await fetch(`${API}/api/conditions`);
-			const data = await res.json();
+			const res = await http.get('/conditions');
+			const data = res.data;
 			setConditions(data);
 		} catch (err) {
 			console.error('Failed to fetch conditions', err);
@@ -68,8 +68,8 @@ const AddPricingModal: React.FC<Props> = ({ open, onClose, onSave }) => {
 
 	const fetchProducts = async (conditionId: number) => {
 		try {
-			const res = await fetch(`${API}/api/products?condition_id=${conditionId}`);
-			const data = await res.json();
+			const res = await http.get(`/products?condition_id=${conditionId}`);
+			const data = res.data;
 			setProducts(data);
 		} catch (err) {
 			console.error('Failed to fetch products', err);
@@ -78,8 +78,8 @@ const AddPricingModal: React.FC<Props> = ({ open, onClose, onSave }) => {
 
 	const fetchAttributes = async (productId: number) => {
 		try {
-			const res = await fetch(`${API}/api/product-attributes?product_id=${productId}`);
-			const data = await res.json();
+			const res = await http.get(`/product-attributes?product_id=${productId}`);
+			const data = res.data;
 			setAttributes(data);
 		} catch (err) {
 			console.error('Failed to fetch attributes', err);
@@ -100,27 +100,14 @@ const AddPricingModal: React.FC<Props> = ({ open, onClose, onSave }) => {
 				price: price,
 			};
 
-			const response = await fetch(`${API}/api/product-pricing`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(pricing),
-			});
-
-			if (!response.ok) {
-				const errorData = await response.json();
-				const errorMessage = errorData?.error?.message || 'Failed to save pricing';
-				const errorType = errorData?.error?.type || null;
-
-				// ✅ Throw object instead of string
-				throw { message: errorMessage, type: errorType };
-			}
+			await http.post('/product-pricing', pricing);
 
 			onSave(pricing);
 			handleClose();
 		} catch (err: any) {
 			// ✅ Properly extract message and type
-			const message = err?.message || 'Unknown error';
-			const type = err?.type || '';
+			const message = err?.response?.data?.error?.message || err?.message || 'Unknown error';
+			const type = err?.response?.data?.error?.type || '';
 
 			setError(
 				type === 'DUPLICATE_PRICING'

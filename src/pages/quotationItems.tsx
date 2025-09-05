@@ -20,7 +20,7 @@ import autoTable from "jspdf-autotable";
 import Bot from "../App";
 import TopAppBar from "../navBars/topAppBar";
 import { useNavAccess } from "../navBars/navBars";
-import API from "../apiConfig";
+import { http } from "../lib/http";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
 
@@ -90,9 +90,9 @@ const QuotationItems = () => {
 
 	useEffect(() => {
 		if (dealerId) {
-			fetch(`${API}/api/dealers/${dealerId}`)
-				.then(res => res.json())
-				.then(data => {
+			http.get(`/dealers/${dealerId}`)
+				.then(res => {
+					const data = res.data;
 					if (data && data.phone) {
 						setDealerContact(data.phone);
 					} else {
@@ -132,15 +132,14 @@ const QuotationItems = () => {
 		if (!quoteId) return;
 
 		// Fetch Notes
-		fetch(`${API}/notes/${quoteId}`)
-			.then((res) => res.json())
-			.then((data) => setNotes(data || []))
+		http.get(`/notes/${quoteId}`)
+			.then((res) => setNotes(res.data || []))
 			.catch(() => setNotes([]));
 
 		// ✅ Fetch Quotation Items and dealer_id
-		fetch(`${API}/quotation-items/${quoteId}`)
-			.then((res) => res.json())
-			.then((data) => {
+		http.get(`/quotation-items/${quoteId}`)
+			.then((res) => {
+				const data = res.data;
 				// ✅ Step 1: Set dealerId if available
 				if (data.length > 0 && data[0].dealer_id) {
 					setDealerId(data[0].dealer_id);
@@ -169,8 +168,8 @@ const QuotationItems = () => {
 				uniqueProductIds.forEach(async (productId) => {
 					if (!attributeOptionsMap[productId]) {
 						try {
-							const res = await fetch(`${API}/attributes/${productId}`);
-							const options = await res.json();
+							const res = await http.get(`/attributes/${productId}`);
+							const options = res.data;
 							setAttributeOptionsMap((prev) => ({
 								...prev,
 								[productId]: options,
@@ -225,8 +224,8 @@ const QuotationItems = () => {
 		setLoadingRows(prev => ({ ...prev, [quoteItemId]: true }));
     
 		try {
-			const res = await fetch(`${API}/pricing/${attributeId}?dealer_id=${dealerId}`);
-			const data = await res.json();
+			const res = await http.get(`/pricing/${attributeId}?dealer_id=${dealerId}`);
+			const data = res.data;
 			return {
 				unitPrice: parseFloat(data.price),
 				costPrice: parseFloat(data.cost_price),
@@ -334,16 +333,9 @@ const QuotationItems = () => {
 		}));
 
 		try {
-			const response = await fetch(
-				`${API}/api/save-quotation-items/${quoteId}`,
-				{
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify(updatedItems),
-				}
-			);
+			const response = await http.post(`/save-quotation-items/${quoteId}`, updatedItems);
 
-			const result = await response.json();
+			const result = response.data;
 			alert(
 				result.success
 					? "Quotation items saved successfully!"
@@ -460,16 +452,9 @@ const QuotationItems = () => {
 			const formData = new FormData();
 			formData.append('file', pdfBlob, `Quotation_${quoteId}.pdf`);
 	
-			const uploadRes = await fetch(`${API}/api/upload-pdf`, {
-				method: 'POST',
-				body: formData,
-			});
+			const uploadRes = await http.post('/upload-pdf', formData);
 	
-			if (!uploadRes.ok) {
-				throw new Error('Failed to upload PDF');
-			}
-	
-			const uploadData = await uploadRes.json();
+			const uploadData = uploadRes.data;
 			const pdfUrl = uploadData.fileUrl;
 	
 			const message = `Hello, please find the quotation PDF here: ${pdfUrl}`;
@@ -496,28 +481,18 @@ const QuotationItems = () => {
 		}));
 
 		try {
-			const saveResponse = await fetch(
-				`${API}/api/save-quotation-items/${quoteId}`,
-				{
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify(updatedItems),
-				},
-			);
-			const saveResult = await saveResponse.json();
+			const saveResponse = await http.post(`/save-quotation-items/${quoteId}`, updatedItems);
+			const saveResult = saveResponse.data;
 
 			if (!saveResult.success) {
 				alert("Failed to save quotation items. Dispatch aborted.");
 				return;
 			}
 
-			const dispatchResponse = await fetch(
-				`${API}/api/quotestoorder/${quoteId}`,
-				{ method: "POST" },
-			);
-			const dispatchResult = await dispatchResponse.json();
+			const dispatchResponse = await http.post(`/quotestoorder/${quoteId}`);
+			const dispatchResult = dispatchResponse.data;
 
-			if (dispatchResponse.ok) {
+			if (dispatchResponse.status === 200) {
 				navigate(`/Order-Line-Items/${dispatchResult.order_id}`);
 			} else {
 				alert(`❌ Dispatch Failed: ${dispatchResult.error || "Unknown error"}`);
@@ -531,16 +506,11 @@ const QuotationItems = () => {
 	const saveNote = async () => {
 		if (!quoteId) return;
 		try {
-			await fetch(`${API}/notes/${quoteId}`, {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ content: noteContent }),
-			});
+			await http.post(`/notes/${quoteId}`, { content: noteContent });
 			setNoteContent("");
 			alert("Note saved successfully!");
-			const res = await fetch(`${API}/notes/${quoteId}`);
-			const data = await res.json();
-			setNotes(data || []);
+			const res = await http.get(`/notes/${quoteId}`);
+			setNotes(res.data || []);
 		} catch {
 			alert("Error saving note.");
 		}

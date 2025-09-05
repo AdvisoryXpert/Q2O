@@ -1,27 +1,17 @@
-import React, { useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
-import { getUserMobile } from "./services/AuthService";
+import React from "react";
+import { Navigate, useLocation } from "react-router-dom";
 
-type Props = {
-	children: JSX.Element;
+/** Simple JWT check: presence of auth_token in localStorage */
+function hasToken() {
+	return !!localStorage.getItem("auth_token");
 }
 
-const ProtectedRoute: React.FC<Props> = ({ children }) => {
-	const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+type Props = { children: React.ReactNode };
 
-	useEffect(() => {
-		const checkAuth = async () => {
-			const mobile = await getUserMobile();
-			setIsAuthenticated(!!mobile);
-		};
-		checkAuth();
-	}, []);
-
-	if (isAuthenticated === null) {
-		return <div>Loading...</div>; // Or a loading spinner
+export default function ProtectedRoute({ children }: Props) {
+	const location = useLocation();
+	if (!hasToken()) {
+		return <Navigate to="/login" replace state={{ from: location }} />;
 	}
-
-	return isAuthenticated ? children : <Navigate to="/" />;
-};
-
-export default ProtectedRoute;
+	return <>{children}</>;
+}

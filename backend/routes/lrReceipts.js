@@ -6,7 +6,8 @@ module.exports = function (db) {
 
   // Fetch all LR Receipts
   router.get('/', (req, res) => {
-    db.query('SELECT * FROM lr_receipts', (err, results) => {
+    const tenant_id = req.tenant_id;
+    db.query('SELECT * FROM lr_receipts WHERE tenant_id = ?', [tenant_id], (err, results) => {
       if (err) return res.status(500).json({ error: 'Database error' });
       res.json(results);
     });
@@ -16,19 +17,20 @@ module.exports = function (db) {
 
   router.post('/', (req, res) => {
     const { lr_number, product_name, manufacturer_name, description, status, executive, phone, user_id } = req.body;
+    const tenant_id = req.tenant_id;
 
     db.query(
       `INSERT INTO lr_receipts 
-      (lr_number, product_name, manufacturer_name, description, status, executive, phone, user_id) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [lr_number, product_name, manufacturer_name, description, status, executive, phone, user_id],
+      (lr_number, product_name, manufacturer_name, description, status, executive, phone, user_id, tenant_id) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [lr_number, product_name, manufacturer_name, description, status, executive, phone, user_id, tenant_id],
       (err, result) => {
         if (err) {
           console.error('Insert Error:', err);
           return res.status(500).json({ error: 'Insert failed' });
         }
         // ✅ Create follow-up for the LR record
-        createFollowup('lr', result.insertId, user_id, user_id);
+        createFollowup('lr', result.insertId, user_id, user_id, null, null, tenant_id);
         res.json({ id: result.insertId });
       }
     );
@@ -38,12 +40,13 @@ module.exports = function (db) {
   router.put('/:id', (req, res) => {
     const { lr_number, product_name, manufacturer_name, description, status, executive, phone, user_id } = req.body;
     const id = parseInt(req.params.id, 10);
+    const tenant_id = req.tenant_id;
 
     db.query(
       `UPDATE lr_receipts 
        SET lr_number=?, product_name=?, manufacturer_name=?, description=?, status=?, executive=?, phone=?, user_id=? 
-       WHERE id=?`,
-      [lr_number, product_name, manufacturer_name, description, status, executive, phone, user_id, id],
+       WHERE id=? AND tenant_id = ?`,
+      [lr_number, product_name, manufacturer_name, description, status, executive, phone, user_id, id, tenant_id],
       (err, result) => {
         if (err) {
           console.error('Update Error:', err);
@@ -56,7 +59,8 @@ module.exports = function (db) {
 
   // Get single LR Receipt by ID
   router.get('/:id', (req, res) => {
-    db.query('SELECT * FROM lr_receipts WHERE id = ?', [req.params.id], (err, results) => {
+    const tenant_id = req.tenant_id;
+    db.query('SELECT * FROM lr_receipts WHERE id = ? AND tenant_id = ?', [req.params.id, tenant_id], (err, results) => {
       if (err) return res.status(500).json({ error: 'Database error' });
       if (results.length === 0) return res.status(404).json({ error: 'Not found' });
       res.json(results[0]);
@@ -65,6 +69,7 @@ module.exports = function (db) {
 
   router.put('/:id/attachment', (req, res) => {
     console.log('📥 Upload endpoint HIT');
+    const tenant_id = req.tenant_id;
   
     if (!req.files) {
       console.log('❌ req.files is undefined');
@@ -89,11 +94,11 @@ module.exports = function (db) {
       }
   
       db.query(
-        'UPDATE lr_receipts SET file_path = ? WHERE id = ?',
-        [fileName, req.params.id],
+        'UPDATE lr_receipts SET file_path = ? WHERE id = ? AND tenant_id = ?',
+        [fileName, req.params.id, tenant_id],
         (err) => {
           if (err) {
-            console.log('❌ DB update failed:', err);
+            console.error('❌ DB update failed:', err);
             return res.status(500).json({ error: 'Database update failed' });
           }
           console.log('✅ File saved and DB updated.');

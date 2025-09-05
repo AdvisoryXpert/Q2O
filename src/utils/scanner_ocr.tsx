@@ -77,7 +77,7 @@ export const CameraOCRScanner = ({ index, onDetected, onClose }: {
 			formData.append('image', blob);
 
 			try {
-				const response = await fetch(`https://192.168.66.103:8000/ocr`, {
+				const response = await fetch(`http://192.168.1.73:8000/ocr`, {
 					method: 'POST',
 					body: formData,
 				});
