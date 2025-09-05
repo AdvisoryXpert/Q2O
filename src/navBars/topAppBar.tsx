@@ -40,7 +40,7 @@ const TopAppBar: React.FC<TopAppBarProps> = ({ navItems }) => {
 			console.error('Error during logout API call:', error);
 		}
 		clearSessionCache();
-		navigate('/');
+		navigate('/login');
 	};
 
 	const scrollLeft = () => scrollRef.current?.scrollBy({ left: -200, behavior: 'smooth' });

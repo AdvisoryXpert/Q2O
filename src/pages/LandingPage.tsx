@@ -1,7 +1,9 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import GetInTouchPopup from '../components/GetInTouchPopup';
 
 const LandingPage = () => {
+	const [showPopup, setShowPopup] = useState(false);
 	useEffect(() => {
 		const aosStyle = document.createElement('link');
 		aosStyle.href = "https://unpkg.com/aos@2.3.1/dist/aos.css";
@@ -126,6 +128,9 @@ const LandingPage = () => {
 				.how-it-works .step {
 					text-align: center;
 				}
+				.how-it-works .step p {
+					margin-bottom: 0.5rem;
+				}
 				.how-it-works .step-number {
 					display: inline-block;
 					width: 50px;
@@ -246,33 +251,40 @@ const LandingPage = () => {
 			<section className="section how-it-works bg-light">
 				<div className="container">
 					<h2 className="section-title" data-aos="fade-up">How It Works</h2>
-					<div className="row">
-						<div className="col-md-3" data-aos="fade-up">
+					<div className="row justify-content-around">
+						<div className="col-md-2" data-aos="fade-up">
 							<div className="step">
 								<div className="step-number">1</div>
 								<h6>Draft Quote</h6>
 								<p>Create a new quote using your products and services.</p>
 							</div>
 						</div>
-						<div className="col-md-3" data-aos="fade-up" data-aos-delay="200">
+						<div className="col-md-2" data-aos="fade-up" data-aos-delay="200">
 							<div className="step">
 								<div className="step-number">2</div>
 								<h6>Get Approval</h6>
 								<p>Send the quote to your client for their approval online.</p>
 							</div>
 						</div>
-						<div className="col-md-3" data-aos="fade-up" data-aos-delay="400">
+						<div className="col-md-2" data-aos="fade-up" data-aos-delay="400">
 							<div className="step">
 								<div className="step-number">3</div>
 								<h6>Convert to Order</h6>
 								<p>Once approved, convert the quote to an order instantly.</p>
 							</div>
 						</div>
-						<div className="col-md-3" data-aos="fade-up" data-aos-delay="600">
+						<div className="col-md-2" data-aos="fade-up" data-aos-delay="600">
 							<div className="step">
 								<div className="step-number">4</div>
 								<h6>Track & Deliver</h6>
 								<p>Manage the order fulfillment and track payments.</p>
+							</div>
+						</div>
+						<div className="col-md-2" data-aos="fade-up" data-aos-delay="800">
+							<div className="step">
+								<div className="step-number">5</div>
+								<h6>Warranty Support</h6>
+								<p>Effortlessly manage product warranties and provide timely support.</p>
 							</div>
 						</div>
 					</div>
@@ -297,8 +309,9 @@ const LandingPage = () => {
 								Our intuitive editor makes it easy to create professional 
 								proposals that win business.
 							</p>
-							<a href="#" className="btn btn-primary">Try for free</a>
-							<a href="#" className="btn btn-outline-primary">Request a demo →</a>
+							<a href="#" className="btn btn-primary me-2">Try for free</a>
+							<button className="btn btn-outline-primary" 
+								onClick={() => setShowPopup(true)}>Request a demo →</button>
 						</div>
 					</div>
 					<div className="row align-items-center synopsis-row flex-row-reverse" data-aos="fade-left">
@@ -316,8 +329,9 @@ const LandingPage = () => {
 								into sales orders with a single click.
 								Track and manage your orders from start to finish.
 							</p>
-							<a href="#" className="btn btn-primary">Try for free</a>
-							<a href="#" className="btn btn-outline-primary">Request a demo →</a>
+							<a href="#" className="btn btn-primary me-2">								Try for free</a>
+							<button className="btn btn-outline-primary" 
+								onClick={() => setShowPopup(true)}>Request a demo →</button>
 						</div>
 					</div>
 					<div className="row align-items-center synopsis-row" data-aos="fade-right">
@@ -335,13 +349,13 @@ const LandingPage = () => {
 								Set up automated reminders for expiring warranties 
 								and provide better customer service.
 							</p>
-							<a href="#" className="btn btn-primary">Try for free</a>
+							<a href="#" className="btn btn-primary me-2">Try for free</a>
+							<button className="btn btn-outline-primary" 
+								onClick={() => setShowPopup(true)}>Request a demo →</button>
 						</div>
 					</div>
 				</div>
 			</section>
-
-			{/* Testimonials Section */}
 			<section id="testimonials" className="section">
 				<div className="container">
 					<h2 className="section-title" data-aos="fade-up">Loved by businesses worldwide</h2>
@@ -517,6 +531,8 @@ const LandingPage = () => {
 					<p>&copy; 2025 Qorza. All rights reserved.</p>
 				</div>
 			</footer>
+
+			{showPopup && <GetInTouchPopup isOpen={showPopup} onClose={() => setShowPopup(false)} />}
 		</div>
 	);
 };
