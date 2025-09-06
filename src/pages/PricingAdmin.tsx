@@ -24,9 +24,6 @@ import {
 	Save as SaveIcon,
 	Cancel as CancelIcon
 } from '@mui/icons-material';
-import TopAppBar from '../navBars/topAppBar';
-import App from '../App';
-import { useNavAccess } from '../navBars/navBars';
 import { http } from '../lib/http';
 import AddPricingModal from './AddPricingModal';
 import EditPricingModal from './EditPricingModal';
@@ -53,7 +50,6 @@ type AccountType = {
 
 const PricingAdmin = () => {
 	const theme = useTheme();
-	const navItems = useNavAccess();
 	const [pricingData, setPricingData] = useState<Pricing[]>([]);
 	const [accountTypes, setAccountTypes] = useState<AccountType[]>([]);
 	const [isLoading, setIsLoading] = useState(false);
@@ -603,8 +599,7 @@ const PricingAdmin = () => {
 
 	return (
 		<>
-			<TopAppBar navItems={navItems} />
-			<Box sx={{ mt: 10, mb: 4, px: { xs: 2, sm: 3, md: 4 } }}>
+			<Box sx={{ px: { xs: 2, sm: 3, md: 4 } }}>
 				<Paper elevation={3} sx={{ p: 3, mb: 3, background: theme.palette.background.paper }}>
 					<Typography variant="h5" 
 						gutterBottom sx={{ fontWeight: 'bold', color: theme.palette.primary.main }}>
@@ -663,7 +658,6 @@ const PricingAdmin = () => {
 					}}
 				/>
 			</Box>
-			<App />
 		</>
 	);
 };

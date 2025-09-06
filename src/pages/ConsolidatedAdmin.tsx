@@ -9,9 +9,6 @@ import { Box, Typography, IconButton, Button, Tooltip } from '@mui/material';
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
-import TopAppBar from '../navBars/topAppBar';
-import App from '../App';
-import { useNavAccess } from '../navBars/navBars';
 import { http } from '../lib/http';
 
 type Condition = {
@@ -39,7 +36,6 @@ type Attribute = {
 };
 
 const ConsolidatedAdmin = () => {
-	const navItems = useNavAccess();
 	const [conditions, setConditions] = useState<Condition[]>([]);
 	const [products, setProducts] = useState<Product[]>([]);
 	const [attributes, setAttributes] = useState<Attribute[]>([]);
@@ -468,8 +464,7 @@ const ConsolidatedAdmin = () => {
 
 	return (
 		<>
-			<TopAppBar navItems={navItems} />
-			<Box sx={{ p: 2, mt: 8 }}>
+			<Box sx={{ p: 2 }}>
 				<Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold' }}>
 					Water Conditions
 				</Typography>
@@ -493,7 +488,6 @@ const ConsolidatedAdmin = () => {
 					</>
 				)}
 			</Box>
-			<App />
 		</>
 	);
 };

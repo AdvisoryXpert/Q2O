@@ -17,9 +17,7 @@ import {
 import ErrorIcon from '@mui/icons-material/Error';
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import Bot from "../App";
-import TopAppBar from "../navBars/topAppBar";
-import { useNavAccess } from "../navBars/navBars";
+import App from "../App";
 import { http } from "../lib/http";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
@@ -85,7 +83,6 @@ const QuotationItems = () => {
 	const [dealerId, setDealerId] = useState<number | null>(null);
 	const [dealerContact, setDealerContact] = useState<string | null>(null);
 	const [showWhatsAppOptions, setShowWhatsAppOptions] = useState(false);
-	const navItems = useNavAccess();
 	const navigate = useNavigate();
 
 	useEffect(() => {
@@ -679,7 +676,6 @@ const QuotationItems = () => {
 
 	return (
 		<Box sx={{ padding: 2 }}>
-			<TopAppBar navItems={navItems} />
 			<Typography variant="h4" mb={2}>
 				Quotation Items
 			</Typography>
@@ -929,7 +925,7 @@ const QuotationItems = () => {
 				<Alert severity="error">{snackbar.message}</Alert>
 			</Snackbar>
 
-			<Bot />
+			<App />
 		</Box>
 	);
 };

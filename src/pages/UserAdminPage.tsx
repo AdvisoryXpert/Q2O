@@ -17,9 +17,6 @@ import {
 	Checkbox,
 } from '@mui/material';
 import { useEffect, useState } from 'react';
-import TopAppBar from '../navBars/topAppBar';
-import App from '../App';
-import { useNavAccess } from '../navBars/navBars';
 import RoleAccessSubview from './roleAccesssubview';
 import { http } from '../lib/http';
 
@@ -328,16 +325,13 @@ const UserManagementTable = () => {
 };
 
 export default function UserManagementApp() {
-	const navItems = useNavAccess();
 
 	return (
 		<>
-			<TopAppBar navItems={navItems} />
-			<Box sx={{ mt: 10, mb: 10 }}>
+			<Box>
 				<UserManagementTable />
 				<RoleAccessSubview />
 			</Box>
-			<App />
 		</>
 	);
 }

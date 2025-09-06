@@ -10,9 +10,6 @@ import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import DeleteIcon from '@mui/icons-material/Delete';
 import RemoveIcon from '@mui/icons-material/Remove';
 import AddIcon from '@mui/icons-material/Add';
-import TopAppBar from '../navBars/topAppBar';
-import App from '../App';
-import { useNavAccess } from '../navBars/navBars';
 import { http } from '../lib/http';
 import { useNavigate } from 'react-router-dom';
 
@@ -24,7 +21,6 @@ const POSPage = () => {
 	const [rows, setRows] = useState([{ product_id: '', component_id: '', components: [], disabled: false }]);
 	const [cartNote, setCartNote] = useState('');
 	const [dropdownWidth, setDropdownWidth] = useState(0);
-	const navItems = useNavAccess();
 	const navigate = useNavigate();
 
 	useEffect(() => {
@@ -165,8 +161,7 @@ const POSPage = () => {
 
 	return (
 		<>
-			<TopAppBar navItems={navItems} />
-			<Box sx={{ mt: 10, mb: 10, px: 4 }}>
+			<Box sx={{ px: 4 }}>
 				<Typography variant="h5" gutterBottom>RO System Point of Sale</Typography>
 
 				<Grid container spacing={4}>
@@ -326,7 +321,6 @@ const POSPage = () => {
 					</Grid>
 				</Grid>
 			</Box>
-			<App />
 		</>
 	);
 };

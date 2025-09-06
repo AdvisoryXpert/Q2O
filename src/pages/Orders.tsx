@@ -12,10 +12,7 @@ import {
 	Button,
 	TablePagination
 } from '@mui/material';
-import TopAppBar from '../navBars/topAppBar';
 import VisibilityIcon from '@mui/icons-material/Visibility';
-import { useNavAccess } from '../navBars/navBars';
-import App from '../App';
 import { http } from '../lib/http';
 import { useNavigate } from 'react-router-dom'; // ✅ Added import for navigate
 
@@ -36,7 +33,6 @@ type Dealer = {
 const OrderListPage = () => {
 	const [orders, setOrders] = useState<Order[]>([]);
 	const [dealers, setDealers] = useState<Dealer[]>([]);
-	const navItems = useNavAccess();
 	const [page, setPage] = useState(0);
 	const [rowsPerPage, setRowsPerPage] = useState(10);
 	const navigate = useNavigate(); // ✅ Defined navigate
@@ -81,9 +77,8 @@ const OrderListPage = () => {
 	const paginatedOrders = orders.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
 	return (
-		<Box sx={{ padding: 4, backgroundColor: '#f4f6f8', minHeight: '100vh' }}>
-			<TopAppBar navItems={navItems} />
-			<Paper elevation={3} sx={{ padding: 3, borderRadius: 2 }}>
+		<Box sx={{ backgroundColor: '#f4f6f8', minHeight: '100vh' }}>
+			<Paper elevation={3} sx={{ borderRadius: 2 }}>
 				<Typography variant="h4" gutterBottom>
 					Recent Orders
 				</Typography>
@@ -183,7 +178,6 @@ const OrderListPage = () => {
 					sx={{ mt: 2 }}
 				/>
 			</Paper>
-			<App />
 		</Box>
 	);
 };

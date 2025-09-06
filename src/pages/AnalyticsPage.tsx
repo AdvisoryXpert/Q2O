@@ -2,8 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { MaterialReactTable, type MRT_ColumnDef } from 'material-react-table';
 import { Box, Typography, TextField, Button } from '@mui/material';
 import { http } from '../lib/http';
-import TopAppBar from '../navBars/topAppBar';
-import { useNavAccess } from '../navBars/navBars';
 
 type LogEntry = {
     id: number;
@@ -25,7 +23,6 @@ type SummaryData = {
 };
 
 const AnalyticsPage: React.FC = () => {
-	const navItems = useNavAccess();
 
 	const [logs, setLogs] = useState<LogEntry[]>([]);
 	const [summary, setSummary] = useState<SummaryData | null>(null);
@@ -88,8 +85,7 @@ const AnalyticsPage: React.FC = () => {
 
 	return (
 		<>
-			<TopAppBar navItems={navItems} />
-			<Box sx={{ mt: 10, mb: 10, p: 3 }}>
+			<Box sx={{ p: 3 }}>
 				<Typography variant="h4" gutterBottom>User Activity Analytics</Typography>
 
 				{summary && (

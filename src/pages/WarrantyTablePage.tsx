@@ -9,9 +9,6 @@ import {
 	TextField
 } from '@mui/material';
 import { MaterialReactTable, type MRT_ColumnDef } from 'material-react-table';
-import TopAppBar from "../navBars/topAppBar";
-import App from "../App";
-import { useNavAccess } from "../navBars/navBars";
 import { useSearchParams } from 'react-router-dom'; // ✅ Added this
 
 import { http } from '../lib/http';
@@ -36,7 +33,6 @@ const WarrantyTablePage = () => {
 	const [statusDraft, setStatusDraft] = useState<'Active' | 'Expired'>('Active');
 	const [searchText, setSearchText] = useState('');
 	const [searchParams] = useSearchParams(); // ✅ For reading URL query
-	const navItems = useNavAccess();
 
 	const fetchWarranties = async () => {
 		const res = await http.get('/warranty');
@@ -126,8 +122,7 @@ const WarrantyTablePage = () => {
 
 	return (
 		<>
-			<TopAppBar navItems={navItems} />
-			<Box sx={{ p: 2, mt: 10 }}>
+			<Box sx={{ p: 2 }}>
 				<Typography variant="h5" mb={2}>
 					Warranty Management
 				</Typography>
@@ -141,7 +136,6 @@ const WarrantyTablePage = () => {
 				/>
 				<MaterialReactTable columns={columns} data={filteredWarranties} enableColumnResizing />
 			</Box>
-			<App />
 		</>
 	);
 };

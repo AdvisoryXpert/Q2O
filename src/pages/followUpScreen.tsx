@@ -14,10 +14,7 @@ import {
 	Alert,
 } from '@mui/material';
 import { http } from '../lib/http';
-import TopAppBar from '../navBars/topAppBar';
-import App from '../App';
 import { useNavigate } from 'react-router-dom';
-import { useNavAccess } from '../navBars/navBars';
 
 type FollowUp = {
   followup_id: string;
@@ -45,7 +42,6 @@ const FollowUpScreen = () => {
 		pageSize: 6,
 	});
 	const [snackbarOpen, setSnackbarOpen] = useState(false);
-	const navItems = useNavAccess();
 
 	useEffect(() => {
 		fetchFollowUps();
@@ -299,8 +295,7 @@ const FollowUpScreen = () => {
 
 	return (
 		<>
-			<TopAppBar navItems={navItems} />
-			<Box sx={{ mt: 10, mb: 10 }}>
+			<Box>
 				<Typography variant="h5" align="center" gutterBottom>
 					Follow-Up Tracker
 				</Typography>
@@ -315,7 +310,6 @@ const FollowUpScreen = () => {
 					Update saved successfully!
 				</Alert>
 			</Snackbar>
-			<App />
 		</>
 	);
 };

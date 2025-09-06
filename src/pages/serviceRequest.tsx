@@ -14,9 +14,6 @@ import {
 	Button,
 } from '@mui/material';
 import { useParams } from 'react-router-dom';
-import TopAppBar from '../navBars/topAppBar';
-import App from '../App';
-import { useNavAccess } from '../navBars/navBars';
 import { http } from '../lib/http';
 
 type ServiceRequest = {
@@ -240,8 +237,7 @@ const ServiceRequestTable = () => {
 
 	return (
 		<>
-			<TopAppBar navItems={useNavAccess()} />
-			<Box sx={{ mt: 10, mb: 10 }}>
+			<Box>
 				<Typography variant="h5" align="center" gutterBottom>
 					Service Request Management
 				</Typography>
@@ -258,7 +254,6 @@ const ServiceRequestTable = () => {
 				</Box>
 				<MaterialReactTable table={table} />
 			</Box>
-			<App />
 		</>
 	);
 };

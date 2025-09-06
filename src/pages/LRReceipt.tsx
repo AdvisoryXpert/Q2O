@@ -1,3 +1,4 @@
+// src/pages/LRReceipt.tsx
 import {
 	MaterialReactTable,
 	MRT_EditActionButtons,
@@ -17,24 +18,22 @@ import {
 import { useEffect, useState } from "react";
 import { getUserId } from "../services/AuthService";
 import { useSearchParams } from "react-router-dom";
-import TopAppBar from "../navBars/topAppBar";
-import App from "../App";
-import { useNavAccess } from "../navBars/navBars";
-import { http } from '../lib/http'; 
+import { http } from "../lib/http";
+
 type LRReceipt = {
-	id: string;
-	lr_number: string;
-	product_name: string;
-	manufacturer_name: string;
-	description: string;
-	status: string;
-	executive: string;
-	phone: string;
-	file_path?: string;
-	user_id?: string;
+  id: string;
+  lr_number: string;
+  product_name: string;
+  manufacturer_name: string;
+  description: string;
+  status: string;
+  executive: string;
+  phone: string;
+  file_path?: string;
+  user_id?: string;
 };
 
-const LRTable = () => {
+const LRReceiptPage = () => {
 	const [receipts, setReceipts] = useState<LRReceipt[]>([]);
 	const [filteredReceipts, setFilteredReceipts] = useState<LRReceipt[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
@@ -42,27 +41,18 @@ const LRTable = () => {
 	const [searchText, setSearchText] = useState("");
 	const [searchParams] = useSearchParams();
 	const lrIdFromQuery = searchParams.get("id");
-	
 
 	const fetchData = async () => {
 		try {
 			setIsLoading(true);
-			const res = await http.get('/lr-receipts');
-			const data = res.data;
+			const { data } = await http.get<LRReceipt[]>("/lr-receipts");
 			setReceipts(data);
-
-			// Filter by lr_id if present in URL
-			if (lrIdFromQuery) {
-				const filtered = data.filter((r: LRReceipt) => String(r.id) === String(lrIdFromQuery));
-				setFilteredReceipts(filtered);
-			  } else {
-				setFilteredReceipts(data);
-			  }
-			  
-
+			setFilteredReceipts(
+				lrIdFromQuery ? data.filter((r) => String(r.id) === String(lrIdFromQuery)) : data
+			);
 			setIsError(false);
-		} catch (error) {
-			console.error("Error fetching data:", error);
+		} catch (e) {
+			console.error("Error fetching data:", e);
 			setIsError(true);
 		} finally {
 			setIsLoading(false);
@@ -71,69 +61,58 @@ const LRTable = () => {
 
 	useEffect(() => {
 		fetchData();
-	}, []);
+		 
+	}, [lrIdFromQuery]);
 
 	useEffect(() => {
 		if (!lrIdFromQuery) {
-			const filtered = receipts.filter((r) =>
-				r.lr_number.toLowerCase().includes(searchText.toLowerCase())
+			const q = searchText.toLowerCase();
+			setFilteredReceipts(
+				receipts.filter((r) => r.lr_number?.toLowerCase().includes(q))
 			);
-			setFilteredReceipts(filtered);
 		}
 	}, [searchText, receipts, lrIdFromQuery]);
 
 	const handleCreate = async (values: Partial<LRReceipt>, userId: string | null) => {
-		if (!userId) {
-			console.error("User ID not available. Cannot create record.");
-			return false;
-		}
+		if (!userId) return false;
 		try {
-			const payload = { ...values, user_id: userId };
-			await http.post('/lr-receipts', payload);
+			await http.post("/lr-receipts", { ...values, user_id: userId });
 			await fetchData();
 			return true;
-		} catch (error) {
-			console.error("Error creating record:", error);
+		} catch (e) {
+			console.error("Error creating record:", e);
 			return false;
 		}
 	};
 
 	const handleUpdate = async (values: LRReceipt) => {
-		const currentUserId = await getUserId();
-		if (!currentUserId) {
-			console.error("User ID not available. Cannot update record.");
-			return false;
-		}
+		const currentUserId = getUserId();
+		if (!currentUserId) return false;
 		try {
-			const payload = { ...values, user_id: currentUserId };
-			await http.put(`/lr-receipts/${values.id}`, payload);
+			await http.put(`/lr-receipts/${values.id}`, { ...values, user_id: currentUserId });
 			await fetchData();
 			return true;
-		} catch (error) {
-			console.error("Error updating record:", error);
+		} catch (e) {
+			console.error("Error updating record:", e);
 			return false;
 		}
 	};
 
 	const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>, id: string) => {
 		if (!e.target.files || e.target.files.length === 0) return;
-	  
 		const file = e.target.files[0];
 		const formData = new FormData();
-		formData.append("file", file); // ✅ Field name must match backend
-	  
+		formData.append("file", file);
 		try {
-		  await http.put(`/lr-receipts/${id}/attachment`, formData);
-	  
-		  await fetchData(); // ✅ Refresh the table
-		} catch (error) {
-		  console.error("Error uploading file:", error);
+			await http.put(`/lr-receipts/${id}/attachment`, formData);
+			await fetchData();
+		} catch (e) {
+			console.error("Error uploading file:", e);
 		}
-	  };
+	};
 
 	const columns: MRT_ColumnDef<LRReceipt>[] = [
-		{ accessorKey: "id", header: "LR ID", enableEditing: false, enableHiding: true , 
-			enableColumnFilter: false, enableSorting: false, size:0},
+		{ accessorKey: "id", header: "LR ID", enableEditing: false, enableHiding: true, enableColumnFilter: false, enableSorting: false, size: 0 },
 		{ accessorKey: "lr_number", header: "LR Number" },
 		{ accessorKey: "product_name", header: "Product Name" },
 		{ accessorKey: "manufacturer_name", header: "Manufacturer Name" },
@@ -159,7 +138,7 @@ const LRTable = () => {
 				<>
 					<input
 						type="file"
-						accept=".pdf, .jpg, .jpeg, .png"
+						accept=".pdf,.jpg,.jpeg,.png"
 						style={{ display: "none" }}
 						id={`upload-${row.original.id}`}
 						onChange={(e) => handleUpload(e, row.original.id)}
@@ -179,7 +158,7 @@ const LRTable = () => {
 			Cell: ({ cell }) =>
 				cell.getValue() ? (
 					<a
-						href={`/uploads/lr-receipts/${cell.getValue()}`}
+						href={`/uploads/lr-receipts/${cell.getValue() as string}`}
 						target="_blank"
 						rel="noopener noreferrer"
 					>
@@ -195,24 +174,49 @@ const LRTable = () => {
 	const table = useMaterialReactTable({
 		columns,
 		data: filteredReceipts,
-		initialState: {
-			columnVisibility: { id: false },
-		},
+		initialState: { columnVisibility: { id: false } },
 		createDisplayMode: "modal",
 		editDisplayMode: "modal",
 		enableEditing: true,
 		getRowId: (row) => String(row.id),
 		onCreatingRowSave: async ({ values, table }) => {
-			const currentUserId = await getUserId();
-			const success = await handleCreate(values, currentUserId);
-			if (success) table.setCreatingRow(null);
+			const ok = await handleCreate(values, getUserId());
+			if (ok) table.setCreatingRow(null);
 		},
 		onEditingRowSave: async ({ values, row, table }) => {
-			const currentUserId = await getUserId();
-			const updatedValues = { ...values, id: row.original.id };
-			const success = await handleUpdate(updatedValues, currentUserId);
-			if (success) table.setEditingRow(null);
+			const ok = await handleUpdate({ ...values, id: row.original.id } as LRReceipt);
+			if (ok) table.setEditingRow(null);
 		},
+
+		// 👇👇 Make the table fill the page and avoid internal scroll
+		enableStickyHeader: false,
+		enableStickyFooter: false,
+		layoutMode: "semantic", // simple DOM layout; plays nicer with full-height parent
+		columnResizeMode: "onChange",
+		enableTopToolbar: true,
+		enableBottomToolbar: true,
+
+		muiTableContainerProps: {
+			sx: {
+				height: "100%",
+				maxHeight: "100% !important",
+				overflow: "hidden !important", // let the page (not the table) manage scroll
+			},
+		},
+		muiTablePaperProps: {
+			sx: {
+				height: "100%",
+				display: "flex",
+				flexDirection: "column",
+				boxShadow: "none",
+			},
+		},
+		muiTableBodyProps: {
+			sx: {
+				"& tr": { height: 48 }, // compact rows
+			},
+		},
+
 		renderCreateRowDialogContent: ({ table, row, internalEditComponents }) => (
 			<>
 				<DialogTitle>Create LR Receipt</DialogTitle>
@@ -235,6 +239,7 @@ const LRTable = () => {
 				</DialogActions>
 			</>
 		),
+
 		renderTopToolbarCustomActions: ({ table }) => (
 			<Box display="flex" gap={2} alignItems="center">
 				<Button variant="contained" onClick={() => table.setCreatingRow(true)}>
@@ -251,32 +256,33 @@ const LRTable = () => {
 				)}
 			</Box>
 		),
-		state: {
-			isLoading,
-			showAlertBanner: isError,
-		},
+
+		state: { isLoading, showAlertBanner: isError },
 	});
 
 	return (
-		<>
-			<Typography variant="h5" sx={{ my: 2 }} textAlign="center">
+	// 👇 Full-viewport page section; no extra scrollbars
+		<Box
+			sx={{
+				height: "100vh",            // fill the app viewport
+				width: "100%",
+				boxSizing: "border-box",
+				display: "flex",
+				flexDirection: "column",
+				overflow: "hidden",         // prevent inner page scrollbars
+				p: 2,
+			}}
+		>
+			<Typography variant="h6" sx={{ mb: 1, flexShrink: 0 }} textAlign="center">
 				LR Receipts Management
 			</Typography>
-			<MaterialReactTable table={table} />
-		</>
+
+			{/* Table area fills remaining space */}
+			<Box sx={{ flex: 1, minHeight: 0 }}>
+				<MaterialReactTable table={table} />
+			</Box>
+		</Box>
 	);
 };
 
-export default function LRReceiptApp() {
-	const navItems = useNavAccess();
-
-	return (
-		<>
-			<TopAppBar navItems={navItems} />
-			<Box sx={{ mt: 10, mb: 10 }}>
-				<LRTable />
-			</Box>
-			<App />
-		</>
-	);
-}
+export default LRReceiptPage;

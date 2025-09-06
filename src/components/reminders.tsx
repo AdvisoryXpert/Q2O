@@ -1,16 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { getUserId } from '../services/AuthService';
-import { Grid, Typography, Paper, Button, Stack } from '@mui/material';
+import { Grid, Typography, Paper, Button, Stack, IconButton } from '@mui/material';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import DescriptionIcon from '@mui/icons-material/Description';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import { http } from '../lib/http'; 
 import { useNavigate } from 'react-router-dom';
+import { ChevronLeft, ChevronRight } from '@mui/icons-material';
+
 const ReminderSection = () => {
 	const [reminders, setReminders] = useState([]);
 	const [currentPage, setCurrentPage] = useState(1);
 	const remindersPerPage = 8;
 	const navigate = useNavigate();
+	const [isCollapsed, setIsCollapsed] = useState(false);
 
 	useEffect(() => {
 		const fetchReminders = async () => {
@@ -60,8 +63,45 @@ const ReminderSection = () => {
 	const startIndex = (currentPage - 1) * remindersPerPage;
 	const currentReminders = reminders.slice(startIndex, startIndex + remindersPerPage);
 
+	if (isCollapsed) {
+		return (
+			<Grid item sx={{ position: 'relative', width: '40px', backgroundColor: '#f5f5f5', borderRight: '1px solid #ddd', p: 2 }}>
+				<IconButton
+					onClick={() => setIsCollapsed(false)}
+					sx={{
+						position: 'absolute',
+						top: '50%',
+						left: 0,
+						transform: 'translateY(-50%)',
+						zIndex: 1,
+						backgroundColor: 'white',
+						border: '1px solid #ddd',
+						padding: '4px',
+					}}
+				>
+					<ChevronRight />
+				</IconButton>
+			</Grid>
+		);
+	}
+
 	return (
-		<Grid component="div" sx={{ width: '18%', backgroundColor: '#f5f5f5', borderRight: '1px solid #ddd', p: 2 }}>
+		<Grid component="div" sx={{ width: '18%', backgroundColor: '#f5f5f5', borderRight: '1px solid #ddd', p: 2, position: 'relative' }}>
+			<IconButton
+				onClick={() => setIsCollapsed(true)}
+				sx={{
+					position: 'absolute',
+					top: '50%',
+					right: -15,
+					transform: 'translateY(-50%)',
+					zIndex: 1,
+					backgroundColor: 'white',
+					border: '1px solid #ddd',
+					padding: '4px',
+				}}
+			>
+				<ChevronLeft />
+			</IconButton>
 			<Typography variant="h6" gutterBottom>
 				<NotificationsActiveIcon sx={{ mr: 1, color: '#ff9800' }} /> Reminders
 			</Typography>

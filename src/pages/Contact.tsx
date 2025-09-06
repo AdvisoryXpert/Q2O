@@ -32,9 +32,6 @@ import {
 } from "@tanstack/react-query";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
-import TopAppBar from "../navBars/topAppBar";
-import App from "../App";
-import { useNavAccess } from "../navBars/navBars";
 import { http } from "../lib/http";
 
 // Dealer Type
@@ -428,14 +425,9 @@ function validateEmail(email: string) {
 const queryClient = new QueryClient();
 
 export default function DealerApp() {
-	const navItems = useNavAccess();
 	return (
 		<QueryClientProvider client={queryClient}>
-			<TopAppBar navItems={navItems} />
-			<Box sx={{ mt: 10, mb: 10 }}>
-				<DealerTable />
-			</Box>
-			<App />
+			<DealerTable />
 		</QueryClientProvider>
 	);
 }
