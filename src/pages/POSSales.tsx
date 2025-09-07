@@ -161,7 +161,7 @@ const POSPage = () => {
 
 	return (
 		<>
-			<Box sx={{ px: 4 }}>
+			<Box sx={{ px: 4, overflowX: 'hidden' }}>
 				<Typography variant="h5" gutterBottom>RO System Point of Sale</Typography>
 
 				<Grid container spacing={4}>
@@ -182,8 +182,8 @@ const POSPage = () => {
 						</FormControl>
 
 						{rows.map((row, index) => (
-							<Box key={index} sx={{ mb: 2, display: 'flex', gap: 2 }}>
-								<FormControl fullWidth>
+							<Box key={index} sx={{ mb: 2, display: 'flex', gap: 1, flexDirection: { xs: 'column', sm: 'row' } }}>
+								<FormControl sx={{ flexGrow: 1 }}>
 									<Autocomplete
 										options={products}
 										getOptionLabel={(option) => option.product_name}
@@ -205,7 +205,7 @@ const POSPage = () => {
 										disabled={row.disabled}
 									/>
 								</FormControl>
-								<FormControl fullWidth>
+								<FormControl sx={{ flexGrow: 1 }}>
 									<InputLabel>Component</InputLabel>
 									<Select
 										value={row.component_id}

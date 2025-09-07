@@ -1,22 +1,41 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from "react";
 import {
-	Box, Typography, Table, TableBody, TableCell, TableContainer,
-	TableHead, TableRow, Paper, TablePagination, CircularProgress,
-	Alert, Chip, IconButton, Snackbar, Grid, Button
-} from '@mui/material';
-import RefreshIcon from '@mui/icons-material/Refresh';
-import { useNavigate } from 'react-router-dom';
+	AppBar,
+	Avatar,
+	Box,
+	Button,
+	Card,
+	CardContent,
+	Chip,
+	Grid,
+	IconButton,
+	InputAdornment,
+	Paper,
+	TextField,
+	Toolbar,
+	Tooltip,
+	Typography,
+	useMediaQuery,
+	useTheme,
+} from "@mui/material";
+import {
+	DataGrid,
+	GridColDef,
+	GridToolbar,
+} from "@mui/x-data-grid";
+import SearchIcon from "@mui/icons-material/Search";
+import DeleteIcon from "@mui/icons-material/Delete";
+import AddIcon from "@mui/icons-material/Add";
+import FilterListIcon from "@mui/icons-material/FilterList";
+import { http } from "../lib/http";
+import { useNavigate } from "react-router-dom";
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import DraftsIcon from '@mui/icons-material/Drafts';
 import SendIcon from '@mui/icons-material/Send';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import VisibilityIcon from '@mui/icons-material/Visibility';
-import { TablePaginationOwnProps } from '@mui/material/TablePagination';
-import { http } from '../lib/http'; // ✅ use shared axios client (adds Authorization)
-import { isAuthenticated } from '../services/AuthService'; // NEW IMPORT
 
+/** Types */
 type Quote = {
   quote_id: number;
   user_id: number;
@@ -26,199 +45,291 @@ type Quote = {
   status: 'draft' | 'sent' | 'accepted' | 'rejected';
 };
 
-const CustomPaginationActions = (props: TablePaginationOwnProps) => {
-	const { count, page, rowsPerPage, onPageChange } = props;
-	return (
-		<Box sx={{ flexShrink: 0, ml: 2.5 }}>
-			<IconButton onClick={(e) => onPageChange(e, page - 1)} disabled={page === 0}>
-				<ChevronLeftIcon />
-			</IconButton>
-			<IconButton
-				onClick={(e) => onPageChange(e, page + 1)}
-				disabled={page >= Math.ceil(count / rowsPerPage) - 1}
-			>
-				<ChevronRightIcon />
-			</IconButton>
-		</Box>
-	);
-};
+/** API helpers */
+async function fetchQuotes(dealerId?: number | string | null, limit?: number): Promise<Quote[]> {
+	let path = dealerId
+		? `/quotestoorder/quotes_by_dealer/${dealerId}`
+		: `/quotestoorder/quotes_dtls`;
+	if (limit) {
+		path += `?limit=${limit}`;
+	}
+	const { data } = await http.get(path);
+	return data ?? [];
+}async function deleteQuote(id: number) {
+	await http.delete(`/quotestoorder/${id}`);
+}
 
 type Props = {
   dealerId?: number | string | null;
-  compact?: boolean;
+  limit?: number;
 };
 
-const QuotationPage: React.FC<Props> = ({ dealerId }) => {
-	const [quotes, setQuotes] = useState<Quote[]>([]);
-	const [isLoading, setIsLoading] = useState(true);
-	const [isError, setIsError] = useState(false);
-	const [page, setPage] = useState(0);
-	const [rowsPerPage, setRowsPerPage] = useState(5);
-	const [snackbarOpen, setSnackbarOpen] = useState(false);
-
+export default function QuotationPage({ dealerId, limit }: Props) {
+	const theme = useTheme();
+	const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 	const navigate = useNavigate();
 
-	async function fetchQuotes() {
-		setIsLoading(true);
-		setIsError(false);
-		try {
-			// ✅ build a relative path (client has baseURL '/api')
-			const path = dealerId
-				? `/quotestoorder/quotes_by_dealer/${dealerId}`
-				: `/quotestoorder/quotes_dtls`;
-
-			const res = await http.get(path);        // ✅ Authorization auto-attached
-			const data = res.data;
-
-			// ✅ normalize to array
-			const arr: Quote[] = Array.isArray(data)
-				? data
-				: Array.isArray((data as any)?.quotes)
-					? (data as any).quotes
-					: [];
-
-			setQuotes(arr);
-			setSnackbarOpen(true);
-			setPage(0);
-		} catch (error) {
-			console.error('Failed to fetch quotations:', error);
-			setIsError(true);
-			setQuotes([]);
-		} finally {
-			setIsLoading(false);
-		}
-	}
+	const [rows, setRows] = useState<Quote[]>([]);
+	const [loading, setLoading] = useState(true);
+	const [error, setError] = useState<string | null>(null);
+	const [search, setSearch] = useState("");
 
 	useEffect(() => {
-		if (isAuthenticated()) { // NEW CHECK
-			fetchQuotes();
-		} else {
-			console.warn("Not authenticated. Skipping quotation fetch."); // Optional: log a warning
-			setIsLoading(false); // Ensure loading state is cleared
-			setQuotes([]); // Clear any previous quotes
+		(async () => {
+			try {
+				setLoading(true);
+				setRows(await fetchQuotes(dealerId, limit));
+				setError(null);
+			} catch {
+				setError("Failed to load quotations.");
+			} finally {
+				setLoading(false);
+			}
+		})();
+	}, [dealerId]);
+
+	const filtered = useMemo(() => {
+		const q = search.trim().toLowerCase();
+		if (!q) return rows;
+		return rows.filter((d) =>
+			[d.quote_id, d.dealer_id, d.status]
+				.filter(Boolean)
+				.some((v) => String(v).toLowerCase().includes(q))
+		);
+	}, [rows, search]);
+
+	const handleDelete = async (d: Quote) => {
+		if (window.confirm(`Delete Quotation "${d.quote_id}"?`)) {
+			try {
+				await deleteQuote(d.quote_id);
+				setRows((prev) => prev.filter((r) => r.quote_id !== d.quote_id));
+			} catch {
+				window.alert("Failed to delete Quotation. Please try again.");
+			}
 		}
-	}, [dealerId, isAuthenticated]);
-
-	const handleChangePage = (_event: unknown, newPage: number) => setPage(newPage);
-
-	const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
-		setRowsPerPage(parseInt(event.target.value, 10));
-		setPage(0);
 	};
 
-	const renderStatusChip = (status: Quote['status']) => {
-		switch (status) {
-		case 'accepted':
-			return <Chip icon={<CheckCircleIcon />} label="Accepted" color="success" variant="outlined" size="small" />;
-		case 'rejected':
-			return <Chip icon={<CancelIcon />} label="Rejected" color="error" variant="outlined" size="small" />;
-		case 'sent':
-			return <Chip icon={<SendIcon />} label="Sent" color="warning" variant="outlined" size="small" />;
-		default:
-			return <Chip icon={<DraftsIcon />} label="Draft" color="warning" variant="outlined" size="small" />;
-		}
-	};
+	/** DataGrid columns (desktop) */
+	const columns: GridColDef[] = [
+		{
+			field: "quote_id",
+			headerName: "Quote ID",
+			flex: 1,
+			minWidth: 150,
+		},
+		{
+			field: "dealer_id",
+			headerName: "Dealer ID",
+			flex: 1,
+			minWidth: 150,
+		},
+		{
+			field: "date_created",
+			headerName: "Date Created",
+			flex: 1,
+			minWidth: 150,
+			valueFormatter: (params) => new Date(params.value as string).toLocaleDateString(),
+		},
+		{
+			field: "total_price",
+			headerName: "Total Price",
+			flex: 1,
+			minWidth: 150,
+			valueFormatter: (params) => `₹${Number(params.value).toFixed(2)}`,
+		},
+		{
+			field: "status",
+			headerName: "Status",
+			flex: 1,
+			minWidth: 120,
+			renderCell: (p) => {
+				const status = p.value as Quote['status'];
+				switch (status) {
+				case 'accepted':
+					return <Chip icon={<CheckCircleIcon />} label="Accepted" color="success" variant="outlined" size="small" />;
+				case 'rejected':
+					return <Chip icon={<CancelIcon />} label="Rejected" color="error" variant="outlined" size="small" />;
+				case 'sent':
+					return <Chip icon={<SendIcon />} label="Sent" color="warning" variant="outlined" size="small" />;
+				default:
+					return <Chip icon={<DraftsIcon />} label="Draft" color="warning" variant="outlined" size="small" />;
+				}
+			}
+		},
+		{
+			field: "actions",
+			headerName: "Actions",
+			sortable: false,
+			filterable: false,
+			disableColumnMenu: true,
+			minWidth: 140,
+			flex: 0.9,
+			renderCell: (p) => {
+				const d = p.row as Quote;
+				return (
+					<Box sx={{ display: "flex", gap: 0.5 }}>
+						<Tooltip title="View">
+							<IconButton size="small" onClick={() => navigate(`/quotation-items/${d.quote_id}`)}>
+								<VisibilityIcon fontSize="small" />
+							</IconButton>
+						</Tooltip>
+						<Tooltip title="Delete">
+							<IconButton size="small" color="error" onClick={() => handleDelete(d)}>
+								<DeleteIcon fontSize="small" />
+							</IconButton>
+						</Tooltip>
+					</Box>
+				);
+			},
+		},
+	];
 
-	const start = page * rowsPerPage;
-	const end = start + rowsPerPage;
-	const paginatedQuotes = quotes.slice(start, end);
+	const gridRows = useMemo(() => filtered.map((d) => ({ id: d.quote_id, ...d })), [filtered]);
 
 	return (
-		<Box sx={{ background: '#f5f7fa', minHeight: '100vh', padding: 4 }}>
-			<Paper elevation={3} sx={{ maxWidth: '100%', margin: '0 auto', borderRadius: 3, overflow: 'hidden' }}>
-				<Grid
-					container
-					alignItems="center"
-					justifyContent="center"
-					sx={{
-						background: 'linear-gradient(90deg, #3f51b5 0%, #2196f3 100%)',
-						color: 'white',
-						padding: '16px 24px',
-						position: 'relative',
-					}}
-				>
-					<Button
-						variant="contained"
-						startIcon={<RefreshIcon />}
-						onClick={fetchQuotes}
-						sx={{ backgroundColor: 'white', color: '#3f51b5', 
-							textTransform: 'none', fontWeight: 'bold', position: 'absolute', left: 24 }}
-					>
-						Refresh
-					</Button>
-					<Typography variant="h4" sx={{ fontWeight: 400, textAlign: 'center', 
-						display: 'flex', alignItems: 'center', gap: 1 }}>
-						Quotation List
-					</Typography>
-				</Grid>
+		<>
+			<Paper
+				sx={{
+					position: "fixed",
+					left: isMobile ? 0 : "var(--app-drawer-width, 240px)",
+					top: "var(--app-header-height, 56px)",
+					right: 0,
+					bottom: 0,
+					display: "flex",
+					flexDirection: "column",
+					borderRadius: 2,
+					boxShadow: 3,
+					overflow: "hidden",
+					bgcolor: "background.paper",
+				}}
+			>
+				{/* TOP BAR */}
+				<AppBar position="static" color="transparent" elevation={0} sx={{ flex: "0 0 auto" }}>
+					<Toolbar sx={{ minHeight: 56, gap: 1, justifyContent: "space-between" }}>
+						<Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
+							<TextField
+								value={search}
+								onChange={(e) => setSearch(e.target.value)}
+								size="medium"
+								placeholder="Search..."
+								InputProps={{
+									startAdornment: (
+										<InputAdornment position="start">
+											<SearchIcon fontSize="small" />
+										</InputAdornment>
+									),
+								}}
+								sx={{ width: { xs: 220, sm: 320, md: 420 } }}
+							/>
+							<Button
+								startIcon={<AddIcon />}
+								variant="contained"
+								onClick={() => navigate('/quotation-from-cart')}
+								sx={{
+									textTransform: "none",
+									fontWeight: 700,
+								}}
+							>
+								New Quotation
+							</Button>
+						</Box>
 
-				<Box sx={{ padding: 3 }}>
-					{isLoading && <CircularProgress sx={{ display: 'block', mx: 'auto', mt: 2 }} />}
-					{isError && <Alert severity="error">Error loading quotations</Alert>}
+						{/* Filter (right) */}
+						<Tooltip title="Open column filters">
+							<IconButton
+								size="small"
+								onClick={() => {
+									const el = document.querySelector('[data-testid="Open filter panel"]') as HTMLElement | null;
+									el?.click();
+								}}
+							>
+								<FilterListIcon />
+							</IconButton>
+						</Tooltip>
+					</Toolbar>
+				</AppBar>
 
-					{!isLoading && !isError && (
-						<TableContainer>
-							<Table>
-								<TableHead>
-									<TableRow>
-										<TableCell>Quote ID</TableCell>
-										<TableCell>Dealer</TableCell>
-										<TableCell>Date Created</TableCell>
-										<TableCell>Total Price</TableCell>
-										<TableCell>Status</TableCell>
-										<TableCell>View</TableCell>
-									</TableRow>
-								</TableHead>
-								<TableBody>
-									{paginatedQuotes.map((quote) => (
-										<TableRow key={quote.quote_id}>
-											<TableCell>{quote.quote_id}</TableCell>
-											<TableCell>{quote.dealer_id ?? 'Unassigned'}</TableCell>
-											<TableCell>{new Date(quote.date_created).toLocaleDateString()}</TableCell>
-											<TableCell>₹{Number(quote.total_price).toFixed(2)}</TableCell>
-											<TableCell>{renderStatusChip(quote.status)}</TableCell>
-											<TableCell>
-												<IconButton color="primary" onClick={() => 
-													navigate(`/quotation-items/${quote.quote_id}`)}>
-													<VisibilityIcon />
-												</IconButton>
-											</TableCell>
-										</TableRow>
-									))}
-									{quotes.length === 0 && (
-										<TableRow>
-											<TableCell colSpan={6} align="center">
-												No quotations found.
-											</TableCell>
-										</TableRow>
-									)}
-								</TableBody>
-							</Table>
-						</TableContainer>
+				{/* CONTENT */}
+				<Box sx={{ flex: "1 1 auto", minHeight: 0, overflow: "auto", p: 1.25 }}>
+					{error && (
+						<Typography color="error" sx={{ mb: 1 }}>
+							{error}
+						</Typography>
 					)}
 
-					<TablePagination
-						rowsPerPageOptions={[5, 10, 25]}
-						component="div"
-						count={quotes.length}
-						rowsPerPage={rowsPerPage}
-						page={page}
-						onPageChange={handleChangePage}
-						onRowsPerPageChange={handleChangeRowsPerPage}
-						ActionsComponent={CustomPaginationActions}
-						sx={{ mt: 2 }}
-					/>
+					{!isMobile ? (
+						<DataGrid
+							columns={columns}
+							rows={gridRows}
+							loading={loading}
+							disableColumnMenu
+							rowSelection={false}
+							hideFooter
+							slots={{ toolbar: GridToolbar }}
+							slotProps={{ toolbar: { showQuickFilter: false } }}
+							columnHeaderHeight={52}
+							rowHeight={56}
+							sx={{
+								borderRadius: 2,
+								backgroundColor: "background.paper",
+								fontSize: ".95rem",
+								"& .MuiDataGrid-columnHeaders": {
+									fontWeight: 800,
+									background:
+                    "linear-gradient(90deg, rgba(7,71,166,0.07) 0%, rgba(7,71,166,0.03) 100%)",
+								},
+								"& .MuiDataGrid-columnHeaderTitle": { fontWeight: 800 },
+								"& .MuiDataGrid-cell": {
+									whiteSpace: "nowrap",
+									overflow: "hidden",
+									textOverflow: "ellipsis",
+								},
+								"& .MuiDataGrid-row:nth-of-type(even)": {
+									backgroundColor: "rgba(0,0,0,0.02)",
+								},
+								"& .MuiDataGrid-row:hover": {
+									backgroundColor: "rgba(7,71,166,0.06)",
+								},
+							}}
+							autoHeight={gridRows.length <= 14}
+						/>
+					) : (
+						<Box
+							sx={{
+								overflowY: "auto",
+								height: "100%",
+								pr: 0.5,
+								"&::-webkit-scrollbar": { width: 6 },
+								"&::-webkit-scrollbar-thumb": { background: theme.palette.grey[400], borderRadius: 3 },
+							}}
+						>
+							<Grid container spacing={1}>
+								{filtered.map((d) => (
+									<Grid item xs={12} key={d.quote_id}>
+										<Card variant="outlined" sx={{ borderRadius: 2 }}>
+											<CardContent sx={{ py: 1.25 }}>
+												<Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+													<Avatar sx={{ width: 32, height: 32, mr: 1, bgcolor: "primary.main" }}>
+														{d.quote_id.toString()?.[0] ?? "?"}
+													</Avatar>
+													<Box sx={{ minWidth: 0, flex: 1 }}>
+														<Typography fontWeight={700} noWrap title={d.quote_id.toString()}>
+															{d.quote_id}
+														</Typography>
+														<Typography variant="caption" color="text.secondary" noWrap>
+															{d.dealer_id}
+														</Typography>
+													</Box>
+												</Box>
+											</CardContent>
+										</Card>
+									</Grid>
+								))}
+							</Grid>
+						</Box>
+					)}
 				</Box>
 			</Paper>
-
-			<Snackbar
-				open={snackbarOpen}
-				autoHideDuration={2000}
-				onClose={() => setSnackbarOpen(false)}
-				message="Quotation list refreshed"
-			/>
-		</Box>
+		</>
 	);
-};
-
-export default QuotationPage;
+}

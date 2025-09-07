@@ -37,4 +37,19 @@ router.get('/:orderId', (req, res) => {
   });
 });
 
+// Get orders from the last month
+router.get('/last-month', (req, res) => {
+    const tenant_id = req.tenant_id;
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+
+    db.query('SELECT * FROM orders WHERE tenant_id = ? AND date_created >= ? order by date_created desc', [tenant_id, oneMonthAgo], (err, results) => {
+        if (err) {
+            console.error('DB Error:', err);
+            return res.status(500).json({ error: 'Database error' });
+        }
+        res.json(results);
+    });
+});
+
 module.exports = router;

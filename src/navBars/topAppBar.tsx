@@ -23,13 +23,11 @@ import MenuOpenIcon from "@mui/icons-material/MenuOpen";
 import LogoutIcon from "@mui/icons-material/Logout";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import { useNavigate, useLocation, Outlet } from "react-router-dom";
-import { navIcons, type NavItem } from "./navicons"; // your file name was navicons.tsx
+import { navIcons, type NavItem } from "./navicons";
 import aquapotLogo from "../images/aquapot-logo-r.jpg";
 import { http } from "../lib/http";
 import { clearSessionCache, getUserName } from "../services/AuthService";
-
-// ⬇️ your chatbot widget (was previously placed inside pages)
-import ChatWidget from "../App"; // rename if default export is App
+import ChatWidget from "../App";
 
 const DRAWER_WIDTH_EXPANDED = 240;
 const DRAWER_WIDTH_COLLAPSED = 72;
@@ -43,13 +41,18 @@ const TopAppBar: React.FC = () => {
 	const navigate = useNavigate();
 	const location = useLocation();
 
+	// remove legacy top spacing inside pages
 	useEffect(() => {
 		document.body.classList.add("no-topbar");
 		return () => document.body.classList.remove("no-topbar");
 	}, []);
 
+	// keep open state in sync with breakpoint
 	useEffect(() => setOpen(!mdDown), [mdDown]);
-	useEffect(() => { (async () => setUserName(await getUserName()))(); }, []);
+
+	useEffect(() => {
+		(async () => setUserName(await getUserName()))();
+	}, []);
 
 	const handleLogout = async () => {
 		try { await http.post("/logout"); } catch {}
@@ -60,9 +63,23 @@ const TopAppBar: React.FC = () => {
 	const toggle = () => setOpen((o) => !o);
 	const drawerWidth = open ? DRAWER_WIDTH_EXPANDED : DRAWER_WIDTH_COLLAPSED;
 
+	// ⬇️ CRITICAL: drive the layout with a CSS var so pages can use left: var(--app-drawer-width)
+	useEffect(() => {
+		const w = mdDown ? 0 : drawerWidth;
+		document.documentElement.style.setProperty("--app-drawer-width", `${w}px`);
+	}, [drawerWidth, mdDown]);
+
 	const drawerContent = useMemo(
 		() => (
-			<Box role="navigation" sx={{ width: mdDown ? DRAWER_WIDTH_EXPANDED : drawerWidth, display: "flex", flexDirection: "column", height: "100%" }}>
+			<Box
+				role="navigation"
+				sx={{
+					width: mdDown ? DRAWER_WIDTH_EXPANDED : drawerWidth,
+					display: "flex",
+					flexDirection: "column",
+					height: "100%",
+				}}
+			>
 				<Toolbar sx={{ minHeight: 64, px: 1.5, gap: 1 }}>
 					<IconButton onClick={toggle} aria-label="Toggle navigation">
 						{open ? <MenuOpenIcon /> : <MenuIcon />}
@@ -104,7 +121,11 @@ const TopAppBar: React.FC = () => {
 							);
 							return (
 								<ListItem key={item.label} disablePadding sx={{ display: "block" }}>
-									{!mdDown && !open ? <Tooltip title={item.label} placement="right">{btn}</Tooltip> : btn}
+									{!mdDown && !open ? (
+										<Tooltip title={item.label} placement="right">{btn}</Tooltip>
+									) : (
+										btn
+									)}
 								</ListItem>
 							);
 						})}
@@ -125,7 +146,9 @@ const TopAppBar: React.FC = () => {
 						</Box>
 					) : (
 						<Tooltip title="Logout">
-							<IconButton onClick={handleLogout} size="small"><LogoutIcon fontSize="small" /></IconButton>
+							<IconButton onClick={handleLogout} size="small">
+								<LogoutIcon fontSize="small" />
+							</IconButton>
 						</Tooltip>
 					)}
 				</Box>
@@ -137,11 +160,19 @@ const TopAppBar: React.FC = () => {
 	return (
 		<Box sx={{ minHeight: "100vh" }}>
 			<CssBaseline />
+
+			{/* Global helpers */}
 			<GlobalStyles
 				styles={{
+					":root": {
+						// defaults; updated dynamically in the effect above:
+						"--app-drawer-width": `${DRAWER_WIDTH_EXPANDED}px`,
+						"--app-header-height": "56px",
+					},
 					"html, body, #root": { height: "100%", width: "100%" },
-					body: { margin: 0 },
-					/* remove legacy top spacing inside pages */
+					body: { margin: 0, overflowX: "hidden" },
+
+					/* Remove legacy top spacing inside pages */
 					"body.no-topbar main": { paddingTop: 0, marginTop: 0 },
 					"body.no-topbar main > .MuiToolbar-root:first-child": {
 						display: "none !important", height: 0, minHeight: 0, paddingTop: 0, marginTop: 0,
@@ -151,8 +182,11 @@ const TopAppBar: React.FC = () => {
            body.no-topbar main > .page-toolbar-spacer": {
 						display: "none !important", height: 0, minHeight: 0, paddingTop: 0, marginTop: 0,
 					},
-					"body.no-topbar main > [style*='margin-top']": { marginTop: "0 !important" },
-					"body.no-topbar main > [style*='padding-top']": { paddingTop: "0 !important" },
+
+					/* Smooth resize for fixed pages that use left: var(--app-drawer-width) */
+					".app-page-fixed": {
+						transition: "left 200ms ease, width 200ms ease",
+					},
 				}}
 			/>
 
@@ -176,7 +210,7 @@ const TopAppBar: React.FC = () => {
 						"& .MuiDrawer-paper": {
 							width: drawerWidth,
 							boxSizing: "border-box",
-							position: "fixed",   // ✅ fixed at left
+							position: "fixed",
 							top: 0,
 							left: 0,
 							height: "100vh",
@@ -194,23 +228,22 @@ const TopAppBar: React.FC = () => {
 				</Drawer>
 			)}
 
-			{/* Main content — pushed right by drawer */}
+			{/* Main outlet – don't push with margin; pages are fixed and read the CSS var */}
 			<Box
 				component="main"
 				sx={{
-					ml: mdDown ? 0 : `${drawerWidth}px`,  // ✅ shift right on desktop
-					p: 2,
-					pt: 0,                                // ✅ no top gap
+					// was: ml: `${drawerWidth}px`
+					// Let fixed pages use left: var(--app-drawer-width) instead.
+					p: 0,
 					minHeight: "100vh",
 					boxSizing: "border-box",
-					overflow: "auto",
-					width: "100%",
+					position: "relative",
 				}}
 			>
 				<Outlet />
 			</Box>
 
-			{/* ✅ Chatbot mounted once for the whole app */}
+			{/* Chatbot */}
 			<Box sx={{ position: "fixed", right: 16, bottom: 16, zIndex: theme.zIndex.modal + 1 }}>
 				<ChatWidget />
 			</Box>

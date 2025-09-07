@@ -1,25 +1,44 @@
-// src/pages/LRReceipt.tsx
+import { useEffect, useMemo, useState } from "react";
 import {
-	MaterialReactTable,
-	MRT_EditActionButtons,
-	type MRT_ColumnDef,
-	useMaterialReactTable,
-} from "material-react-table";
-import {
+	AppBar,
+	Avatar,
 	Box,
 	Button,
+	Card,
+	CardContent,
+	Chip,
+	Dialog,
 	DialogActions,
 	DialogContent,
 	DialogTitle,
+	Grid,
+	IconButton,
+	InputAdornment,
+	Paper,
+	Tab,
+	Tabs,
 	TextField,
+	Toolbar,
+	Tooltip,
 	Typography,
-	MenuItem,
+	useMediaQuery,
+	useTheme,
 } from "@mui/material";
-import { useEffect, useState } from "react";
-import { getUserId } from "../services/AuthService";
-import { useSearchParams } from "react-router-dom";
+import {
+	DataGrid,
+	GridColDef,
+	GridRowModel,
+	GridToolbar,
+} from "@mui/x-data-grid";
+import SearchIcon from "@mui/icons-material/Search";
+import EditIcon from "@mui/icons-material/Edit";
+import DeleteIcon from "@mui/icons-material/Delete";
+import AddIcon from "@mui/icons-material/Add";
+import FilterListIcon from "@mui/icons-material/FilterList";
+import CloseIcon from "@mui/icons-material/Close";
 import { http } from "../lib/http";
 
+/** Types */
 type LRReceipt = {
   id: string;
   lr_number: string;
@@ -33,256 +52,361 @@ type LRReceipt = {
   user_id?: string;
 };
 
-const LRReceiptPage = () => {
-	const [receipts, setReceipts] = useState<LRReceipt[]>([]);
-	const [filteredReceipts, setFilteredReceipts] = useState<LRReceipt[]>([]);
-	const [isLoading, setIsLoading] = useState(true);
-	const [isError, setIsError] = useState(false);
-	const [searchText, setSearchText] = useState("");
-	const [searchParams] = useSearchParams();
-	const lrIdFromQuery = searchParams.get("id");
+/** API helpers */
+async function fetchLRReceipts(): Promise<LRReceipt[]> {
+	const { data } = await http.get("/lr-receipts");
+	return data ?? [];
+}
+async function updateLRReceipt(id: string, patch: Partial<LRReceipt>) {
+	await http.put(`/lr-receipts/${id}`, patch);
+}
 
-	const fetchData = async () => {
-		try {
-			setIsLoading(true);
-			const { data } = await http.get<LRReceipt[]>("/lr-receipts");
-			setReceipts(data);
-			setFilteredReceipts(
-				lrIdFromQuery ? data.filter((r) => String(r.id) === String(lrIdFromQuery)) : data
-			);
-			setIsError(false);
-		} catch (e) {
-			console.error("Error fetching data:", e);
-			setIsError(true);
-		} finally {
-			setIsLoading(false);
-		}
-	};
+export default function LRReceiptPage() {
+	const theme = useTheme();
+	const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+
+	const [rows, setRows] = useState<LRReceipt[]>([]);
+	const [loading, setLoading] = useState(true);
+	const [error, setError] = useState<string | null>(null);
+	const [search, setSearch] = useState("");
+
+	// dialogs
+	const [detailOpen, setDetailOpen] = useState(false);
+	const [activeTab, setActiveTab] = useState(0);
+	const [selected, setSelected] = useState<LRReceipt | null>(null);
 
 	useEffect(() => {
-		fetchData();
-		 
-	}, [lrIdFromQuery]);
+		(async () => {
+			try {
+				setLoading(true);
+				setRows(await fetchLRReceipts());
+				setError(null);
+			} catch {
+				setError("Failed to load LR receipts.");
+			} finally {
+				setLoading(false);
+			}
+		})();
+	}, []);
 
-	useEffect(() => {
-		if (!lrIdFromQuery) {
-			const q = searchText.toLowerCase();
-			setFilteredReceipts(
-				receipts.filter((r) => r.lr_number?.toLowerCase().includes(q))
-			);
-		}
-	}, [searchText, receipts, lrIdFromQuery]);
+	const filtered = useMemo(() => {
+		const q = search.trim().toLowerCase();
+		if (!q) return rows;
+		return rows.filter((d) =>
+			[d.lr_number, d.product_name, d.manufacturer_name, d.executive]
+				.filter(Boolean)
+				.some((v) => String(v).toLowerCase().includes(q))
+		);
+	}, [rows, search]);
 
-	const handleCreate = async (values: Partial<LRReceipt>, userId: string | null) => {
-		if (!userId) return false;
-		try {
-			await http.post("/lr-receipts", { ...values, user_id: userId });
-			await fetchData();
-			return true;
-		} catch (e) {
-			console.error("Error creating record:", e);
-			return false;
+	const handleViewDetails = (d: LRReceipt) => {
+		setSelected(d);
+		setDetailOpen(true);
+	};
+
+	const handleDelete = async (d: LRReceipt) => {
+		if (window.confirm(`Delete LR Receipt "${d.lr_number}"?`)) {
+			try {
+				await http.delete(`/lr-receipts/${d.id}`);
+				setRows((prev) => prev.filter((r) => r.id !== d.id));
+			} catch {
+				window.alert("Failed to delete LR Receipt. Please try again.");
+			}
 		}
 	};
 
-	const handleUpdate = async (values: LRReceipt) => {
-		const currentUserId = getUserId();
-		if (!currentUserId) return false;
-		try {
-			await http.put(`/lr-receipts/${values.id}`, { ...values, user_id: currentUserId });
-			await fetchData();
-			return true;
-		} catch (e) {
-			console.error("Error updating record:", e);
-			return false;
+	/** Inline edit save */
+	const processRowUpdate = async (newRow: GridRowModel, oldRow: GridRowModel) => {
+		const id = String(newRow.id);
+		const patch: Partial<LRReceipt> = {};
+		([
+			"lr_number",
+			"product_name",
+			"manufacturer_name",
+			"description",
+			"status",
+			"executive",
+			"phone",
+		] as const).forEach((k) => {
+			if (newRow[k] !== oldRow[k]) (patch as any)[k] = newRow[k];
+		});
+		if (Object.keys(patch).length) {
+			await updateLRReceipt(id, patch);
+			setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
 		}
+		return newRow;
 	};
 
-	const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>, id: string) => {
-		if (!e.target.files || e.target.files.length === 0) return;
-		const file = e.target.files[0];
-		const formData = new FormData();
-		formData.append("file", file);
-		try {
-			await http.put(`/lr-receipts/${id}/attachment`, formData);
-			await fetchData();
-		} catch (e) {
-			console.error("Error uploading file:", e);
-		}
-	};
-
-	const columns: MRT_ColumnDef<LRReceipt>[] = [
-		{ accessorKey: "id", header: "LR ID", enableEditing: false, enableHiding: true, enableColumnFilter: false, enableSorting: false, size: 0 },
-		{ accessorKey: "lr_number", header: "LR Number" },
-		{ accessorKey: "product_name", header: "Product Name" },
-		{ accessorKey: "manufacturer_name", header: "Manufacturer Name" },
-		{ accessorKey: "description", header: "Description" },
+	/** DataGrid columns (desktop) */
+	const columns: GridColDef[] = [
 		{
-			accessorKey: "status",
-			header: "Status",
-			muiEditTextFieldProps: {
-				select: true,
-				children: ["Open", "Closed", "Pending"].map((status) => (
-					<MenuItem key={status} value={status}>
-						{status}
-					</MenuItem>
-				)),
-			},
+			field: "lr_number",
+			headerName: "LR Number",
+			flex: 1,
+			minWidth: 150,
+			editable: true,
 		},
-		{ accessorKey: "executive", header: "Executive" },
-		{ accessorKey: "phone", header: "Phone" },
 		{
-			accessorKey: "upload",
-			header: "Upload Attachment",
-			Cell: ({ row }) => (
-				<>
-					<input
-						type="file"
-						accept=".pdf,.jpg,.jpeg,.png"
-						style={{ display: "none" }}
-						id={`upload-${row.original.id}`}
-						onChange={(e) => handleUpload(e, row.original.id)}
-					/>
-					<label htmlFor={`upload-${row.original.id}`}>
-						<Button variant="outlined" size="small" component="span">
-							Upload
-						</Button>
-					</label>
-				</>
+			field: "product_name",
+			headerName: "Product Name",
+			flex: 1,
+			minWidth: 150,
+			editable: true,
+		},
+		{
+			field: "manufacturer_name",
+			headerName: "Manufacturer",
+			flex: 1,
+			minWidth: 150,
+			editable: true,
+		},
+		{
+			field: "executive",
+			headerName: "Executive",
+			flex: 1,
+			minWidth: 150,
+			editable: true,
+		},
+		{
+			field: "status",
+			headerName: "Status",
+			flex: 1,
+			minWidth: 120,
+			editable: true,
+			renderCell: (p) => (
+				<Chip
+					label={p.value || "-"}
+					size="small"
+					color={p.value === "Open" ? "success" : p.value === "Closed" ? "error" : "warning"}
+					variant="filled"
+					sx={{
+						height: 24,
+						"& .MuiChip-label": { px: 1, fontSize: 12, fontWeight: 600 },
+					}}
+				/>
 			),
-			enableEditing: false,
 		},
 		{
-			accessorKey: "file_path",
-			header: "Attachment",
-			Cell: ({ cell }) =>
-				cell.getValue() ? (
-					<a
-						href={`/uploads/lr-receipts/${cell.getValue() as string}`}
-						target="_blank"
-						rel="noopener noreferrer"
-					>
-						View
-					</a>
-				) : (
-					<span>No file</span>
-				),
-			enableEditing: false,
+			field: "actions",
+			headerName: "Actions",
+			sortable: false,
+			filterable: false,
+			disableColumnMenu: true,
+			minWidth: 140,
+			flex: 0.9,
+			renderCell: (p) => {
+				const d = p.row as LRReceipt;
+				return (
+					<Box sx={{ display: "flex", gap: 0.5 }}>
+						<Tooltip title="Details">
+							<IconButton size="small" onClick={() => handleViewDetails(d)}>
+								<EditIcon fontSize="small" />
+							</IconButton>
+						</Tooltip>
+						<Tooltip title="Delete">
+							<IconButton size="small" color="error" onClick={() => handleDelete(d)}>
+								<DeleteIcon fontSize="small" />
+							</IconButton>
+						</Tooltip>
+					</Box>
+				);
+			},
 		},
 	];
 
-	const table = useMaterialReactTable({
-		columns,
-		data: filteredReceipts,
-		initialState: { columnVisibility: { id: false } },
-		createDisplayMode: "modal",
-		editDisplayMode: "modal",
-		enableEditing: true,
-		getRowId: (row) => String(row.id),
-		onCreatingRowSave: async ({ values, table }) => {
-			const ok = await handleCreate(values, getUserId());
-			if (ok) table.setCreatingRow(null);
-		},
-		onEditingRowSave: async ({ values, row, table }) => {
-			const ok = await handleUpdate({ ...values, id: row.original.id } as LRReceipt);
-			if (ok) table.setEditingRow(null);
-		},
-
-		// 👇👇 Make the table fill the page and avoid internal scroll
-		enableStickyHeader: false,
-		enableStickyFooter: false,
-		layoutMode: "semantic", // simple DOM layout; plays nicer with full-height parent
-		columnResizeMode: "onChange",
-		enableTopToolbar: true,
-		enableBottomToolbar: true,
-
-		muiTableContainerProps: {
-			sx: {
-				height: "100%",
-				maxHeight: "100% !important",
-				overflow: "hidden !important", // let the page (not the table) manage scroll
-			},
-		},
-		muiTablePaperProps: {
-			sx: {
-				height: "100%",
-				display: "flex",
-				flexDirection: "column",
-				boxShadow: "none",
-			},
-		},
-		muiTableBodyProps: {
-			sx: {
-				"& tr": { height: 48 }, // compact rows
-			},
-		},
-
-		renderCreateRowDialogContent: ({ table, row, internalEditComponents }) => (
-			<>
-				<DialogTitle>Create LR Receipt</DialogTitle>
-				<DialogContent sx={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-					{internalEditComponents}
-				</DialogContent>
-				<DialogActions>
-					<MRT_EditActionButtons variant="text" table={table} row={row} />
-				</DialogActions>
-			</>
-		),
-		renderEditRowDialogContent: ({ table, row, internalEditComponents }) => (
-			<>
-				<DialogTitle>Edit LR Receipt</DialogTitle>
-				<DialogContent sx={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-					{internalEditComponents}
-				</DialogContent>
-				<DialogActions>
-					<MRT_EditActionButtons variant="text" table={table} row={row} />
-				</DialogActions>
-			</>
-		),
-
-		renderTopToolbarCustomActions: ({ table }) => (
-			<Box display="flex" gap={2} alignItems="center">
-				<Button variant="contained" onClick={() => table.setCreatingRow(true)}>
-					Create New LR Receipt
-				</Button>
-				{!lrIdFromQuery && (
-					<TextField
-						label="Search by LR Number"
-						variant="outlined"
-						size="small"
-						value={searchText}
-						onChange={(e) => setSearchText(e.target.value)}
-					/>
-				)}
-			</Box>
-		),
-
-		state: { isLoading, showAlertBanner: isError },
-	});
+	const gridRows = useMemo(() => filtered.map((d) => ({ id: d.id, ...d })), [filtered]);
 
 	return (
-	// 👇 Full-viewport page section; no extra scrollbars
-		<Box
-			sx={{
-				height: "100vh",            // fill the app viewport
-				width: "100%",
-				boxSizing: "border-box",
-				display: "flex",
-				flexDirection: "column",
-				overflow: "hidden",         // prevent inner page scrollbars
-				p: 2,
-			}}
-		>
-			<Typography variant="h6" sx={{ mb: 1, flexShrink: 0 }} textAlign="center">
-				LR Receipts Management
-			</Typography>
+		<>
+			<Paper
+				sx={{
+					position: "fixed",
+					left: isMobile ? 0 : "var(--app-drawer-width, 240px)",
+					top: "var(--app-header-height, 56px)",
+					right: 0,
+					bottom: 0,
+					display: "flex",
+					flexDirection: "column",
+					borderRadius: 2,
+					boxShadow: 3,
+					overflow: "hidden",
+					bgcolor: "background.paper",
+				}}
+			>
+				{/* TOP BAR */}
+				<AppBar position="static" color="transparent" elevation={0} sx={{ flex: "0 0 auto" }}>
+					<Toolbar sx={{ minHeight: 56, gap: 1, justifyContent: "space-between" }}>
+						<Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
+							<TextField
+								value={search}
+								onChange={(e) => setSearch(e.target.value)}
+								size="medium"
+								placeholder="Search..."
+								InputProps={{
+									startAdornment: (
+										<InputAdornment position="start">
+											<SearchIcon fontSize="small" />
+										</InputAdornment>
+									),
+								}}
+								sx={{ width: { xs: 220, sm: 320, md: 420 } }}
+							/>
+							<Button
+								startIcon={<AddIcon />}
+								variant="contained"
+								sx={{
+									textTransform: "none",
+									fontWeight: 700,
+								}}
+							>
+								New LR Receipt
+							</Button>
+						</Box>
 
-			{/* Table area fills remaining space */}
-			<Box sx={{ flex: 1, minHeight: 0 }}>
-				<MaterialReactTable table={table} />
-			</Box>
-		</Box>
+						{/* Filter (right) */}
+						<Tooltip title="Open column filters">
+							<IconButton
+								size="small"
+								onClick={() => {
+									const el = document.querySelector('[data-testid="Open filter panel"]') as HTMLElement | null;
+									el?.click();
+								}}
+							>
+								<FilterListIcon />
+							</IconButton>
+						</Tooltip>
+					</Toolbar>
+				</AppBar>
+
+				{/* CONTENT */}
+				<Box sx={{ flex: "1 1 auto", minHeight: 0, overflow: "auto", p: 1.25 }}>
+					{error && (
+						<Typography color="error" sx={{ mb: 1 }}>
+							{error}
+						</Typography>
+					)}
+
+					{!isMobile ? (
+						<DataGrid
+							columns={columns}
+							rows={gridRows}
+							loading={loading}
+							editMode="row"
+							processRowUpdate={processRowUpdate}
+							onProcessRowUpdateError={(err) => console.error(err)}
+							disableColumnMenu
+							rowSelection={false}
+							hideFooter
+							slots={{ toolbar: GridToolbar }}
+							slotProps={{ toolbar: { showQuickFilter: false } }}
+							columnHeaderHeight={52}
+							rowHeight={56}
+							sx={{
+								borderRadius: 2,
+								backgroundColor: "background.paper",
+								fontSize: ".95rem",
+								"& .MuiDataGrid-columnHeaders": {
+									fontWeight: 800,
+									background:
+                    "linear-gradient(90deg, rgba(7,71,166,0.07) 0%, rgba(7,71,166,0.03) 100%)",
+								},
+								"& .MuiDataGrid-columnHeaderTitle": { fontWeight: 800 },
+								"& .MuiDataGrid-cell": {
+									whiteSpace: "nowrap",
+									overflow: "hidden",
+									textOverflow: "ellipsis",
+								},
+								"& .MuiDataGrid-row:nth-of-type(even)": {
+									backgroundColor: "rgba(0,0,0,0.02)",
+								},
+								"& .MuiDataGrid-row:hover": {
+									backgroundColor: "rgba(7,71,166,0.06)",
+								},
+							}}
+							autoHeight={gridRows.length <= 14}
+						/>
+					) : (
+						<Box
+							sx={{
+								overflowY: "auto",
+								height: "100%",
+								pr: 0.5,
+								"&::-webkit-scrollbar": { width: 6 },
+								"&::-webkit-scrollbar-thumb": { background: theme.palette.grey[400], borderRadius: 3 },
+							}}
+						>
+							<Grid container spacing={1}>
+								{filtered.map((d) => (
+									<Grid item xs={12} key={d.id}>
+										<Card variant="outlined" sx={{ borderRadius: 2 }}>
+											<CardContent sx={{ py: 1.25 }}>
+												<Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+													<Avatar sx={{ width: 32, height: 32, mr: 1, bgcolor: "primary.main" }}>
+														{d.lr_number?.[0] ?? "?"}
+													</Avatar>
+													<Box sx={{ minWidth: 0, flex: 1 }}>
+														<Typography fontWeight={700} noWrap title={d.lr_number}>
+															{d.lr_number}
+														</Typography>
+														<Typography variant="caption" color="text.secondary" noWrap>
+															{d.product_name}
+														</Typography>
+													</Box>
+												</Box>
+											</CardContent>
+										</Card>
+									</Grid>
+								))}
+							</Grid>
+						</Box>
+					)}
+				</Box>
+			</Paper>
+
+			{/* Details dialog */}
+			<Dialog
+				open={detailOpen}
+				onClose={() => setDetailOpen(false)}
+				fullWidth
+				maxWidth="md"
+				PaperProps={{ sx: { borderRadius: 2 } }}
+			>
+				<DialogTitle sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+					<Typography variant="h6">LR Receipt Details</Typography>
+					<IconButton onClick={() => setDetailOpen(false)} size="small">
+						<CloseIcon />
+					</IconButton>
+				</DialogTitle>
+				<DialogContent dividers>
+					{selected ? (
+						<Box>
+							<Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} sx={{ mb: 1 }}>
+								<Tab label="Overview" />
+								<Tab label="Details" />
+							</Tabs>
+
+							{activeTab === 0 && (
+								<Grid container spacing={2}>
+									{/* Overview content here */}
+								</Grid>
+							)}
+
+							{activeTab === 1 && (
+								<Grid container spacing={2}>
+									{/* Details content here */}
+								</Grid>
+							)}
+						</Box>
+					) : (
+						<Typography>No receipt selected</Typography>
+					)}
+				</DialogContent>
+				<DialogActions>
+					<Button onClick={() => setDetailOpen(false)} variant="outlined">
+						Close
+					</Button>
+				</DialogActions>
+			</Dialog>
+		</>
 	);
-};
-
-export default LRReceiptPage;
+}

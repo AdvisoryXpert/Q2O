@@ -134,19 +134,21 @@ export {
 
 import * as React from 'react';
 import * as ReactDOM from 'react-dom/client';
-//import App from './App';
-//import QuotationItems from './components/quotationItems'; // Import QuotationItems
 import { BrowserRouter } from "react-router-dom";
 import Router from "./router";
+import { ThemeProvider } from '@mui/material/styles';
+import theme from './theme';
 
 
 const root = ReactDOM.createRoot(document.getElementById('root')!);
 root.render(
 	<React.StrictMode>		
 		<ChatBotProvider>
-			<BrowserRouter>
-				<Router />
-			</BrowserRouter>
+			<ThemeProvider theme={theme}>
+				<BrowserRouter>
+					<Router />
+				</BrowserRouter>
+			</ThemeProvider>
 		</ChatBotProvider>
 	</React.StrictMode>
 );

@@ -1,40 +1,53 @@
-//npx prettier --write ./src/pages/Contact.tsx
-import { useMemo, useState } from "react";
-import QuotationPage from "./QuotationPage";
-import { Dialog, Typography } from "@mui/material";
-
-import VisibilityIcon from "@mui/icons-material/Visibility";
-
+import { useEffect, useMemo, useState } from "react";
 import {
-	MRT_EditActionButtons,
-	MaterialReactTable,
-	type MRT_ColumnDef,
-	type MRT_Row,
-	type MRT_TableOptions,
-	useMaterialReactTable,
-} from "material-react-table";
-import {
+	AppBar,
+	Avatar,
 	Box,
 	Button,
+	Card,
+	CardContent,
+	Chip,
+	Dialog,
 	DialogActions,
 	DialogContent,
 	DialogTitle,
+	Grid,
 	IconButton,
-	MenuItem,
+	InputAdornment,
+	Paper,
+	Tab,
+	Tabs,
+	TextField,
+	Toolbar,
 	Tooltip,
+	Typography,
+	useMediaQuery,
+	useTheme,
 } from "@mui/material";
 import {
-	QueryClient,
-	QueryClientProvider,
-	useMutation,
-	useQuery,
-	useQueryClient,
-} from "@tanstack/react-query";
+	DataGrid,
+	GridColDef,
+	GridRowModel,
+	GridToolbar,
+} from "@mui/x-data-grid";
+import SearchIcon from "@mui/icons-material/Search";
+import VisibilityIcon from "@mui/icons-material/Visibility";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
+import EmailIcon from "@mui/icons-material/Email";
+import PhoneIcon from "@mui/icons-material/Phone";
+import PlaceIcon from "@mui/icons-material/Place";
+import StarIcon from "@mui/icons-material/Star";
+import StarBorderIcon from "@mui/icons-material/StarBorder";
+import PersonIcon from "@mui/icons-material/Person";
+import BusinessIcon from "@mui/icons-material/Business";
+import CloseIcon from "@mui/icons-material/Close";
+import AddIcon from "@mui/icons-material/Add";
+import FilterListIcon from "@mui/icons-material/FilterList";
 import { http } from "../lib/http";
+import QuotationPage from "./QuotationPage";
 
-// Dealer Type
+/** Types */
 type Dealer = {
   dealer_id: string;
   full_name: string;
@@ -42,392 +55,597 @@ type Dealer = {
   email: string;
   phone: string;
   date_created: string;
-  is_important?: boolean;
-  dealer_type?: "Individual" | "Dealer";
-  account_type?: "Default" | "OEM" | "Technician" | "End Customer" | "Wholeseller";
+  is_important?: number | boolean;
+  dealer_type?: string;
+  account_type?: string;
   gst_number?: string;
 };
 
-// DealerTable Component
-const DealerTable = () => {
-	const [validationErrors, setValidationErrors] = useState<
-    Record<string, string | undefined>
-  >({});
-	const [quoteModalOpen, setQuoteModalOpen] = useState(false);
-	const [selectedDealerId, setSelectedDealerId] = useState<string | null>(null);
+/** API helpers */
+async function fetchDealers(): Promise<Dealer[]> {
+	const { data } = await http.get("/dealers");
+	return data ?? [];
+}
+async function updateDealer(id: string, patch: Partial<Dealer>) {
+	await http.put(`/dealers/${id}`, patch);
+}
 
-	const handleOpenQuotes = (dealerId: string) => {
-		setSelectedDealerId(dealerId);
-		setQuoteModalOpen(true);
+export default function Contact() {
+	const theme = useTheme();
+	const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+
+	const [rows, setRows] = useState<Dealer[]>([]);
+	const [loading, setLoading] = useState(true);
+	const [error, setError] = useState<string | null>(null);
+	const [search, setSearch] = useState("");
+
+	// dialogs
+	const [quoteOpen, setQuoteOpen] = useState(false);
+	const [detailOpen, setDetailOpen] = useState(false);
+	const [activeTab, setActiveTab] = useState(0);
+	const [selected, setSelected] = useState<Dealer | null>(null);
+
+	useEffect(() => {
+		(async () => {
+			try {
+				setLoading(true);
+				setRows(await fetchDealers());
+				setError(null);
+			} catch {
+				setError("Failed to load dealers.");
+			} finally {
+				setLoading(false);
+			}
+		})();
+	}, []);
+
+	const filtered = useMemo(() => {
+		const q = search.trim().toLowerCase();
+		if (!q) return rows;
+		return rows.filter((d) =>
+			[d.full_name, d.email, d.phone, d.location, d.account_type, d.dealer_type]
+				.filter(Boolean)
+				.some((v) => String(v).toLowerCase().includes(q))
+		);
+	}, [rows, search]);
+
+	const handleViewQuotes = (d: Dealer) => {
+		setSelected(d);
+		setQuoteOpen(true);
 	};
-
-	const columns = useMemo<MRT_ColumnDef<Dealer>[]>(
-		() => [
-			{
-				accessorKey: "dealer_id",
-				header: "ID",
-				enableEditing: false,
-				size: 80,
-			},
-			{
-				accessorKey: "is_important",
-				header: "Important",
-				Cell: ({ cell }) => (cell.getValue<number>() === 1 ? "Yes" : "No"),
-				muiEditTextFieldProps: {
-					select: true,
-					children: [1, 0].map((val) => (
-						<MenuItem key={val} value={val}>
-							{val === 1 ? "Yes" : "No"}
-						</MenuItem>
-					)),
-				},
-			},
-			{
-				accessorKey: "full_name",
-				header: "Name",
-				Cell: ({ row }) => {
-					const dealer = row.original;
-					return (
-						<span>
-							{dealer.full_name}
-							{dealer.is_important ? " ⭐" : ""}
-						</span>
-					);
-				},
-			},
-			{
-				accessorKey: "location",
-				header: "Location",
-			},
-			{
-				accessorKey: "email",
-				header: "Email",
-				muiEditTextFieldProps: {
-					type: "email",
-					required: true,
-					error: !!validationErrors?.email,
-					helperText: validationErrors?.email,
-					onFocus: () =>
-						setValidationErrors({ ...validationErrors, email: undefined }),
-				},
-			},
-			{
-				accessorKey: "phone",
-				header: "Phone",
-			},
-			{
-				accessorKey: "gst_number",
-				header: "GST Number",
-				muiEditTextFieldProps: {
-					placeholder: "Optional",
-				},
-			},
-			{
-				accessorKey: "dealer_type",
-				header: "Type",
-				muiEditTextFieldProps: {
-					select: true,
-					children: ["Individual", "Dealer"].map((val) => (
-						<MenuItem key={val} value={val}>{val}</MenuItem>
-					)),
-				},
-			},
-			{
-				accessorKey: "account_type",
-				header: "Account Type",
-				muiEditTextFieldProps: {
-					select: true,
-					children: ["Default", "OEM", "Technician", "End Customer", "Wholeseller"].map((val) => (
-						<MenuItem key={val} value={val}>{val}</MenuItem>
-					)),
-				},
-			},
-			{
-				accessorKey: "date_created",
-				header: "Date Created",
-				enableEditing: false,
-			},
-			{
-				header: "Quotes Details",
-				Cell: ({ row }) => (
-					<Tooltip title="View Quotes">
-						<IconButton
-							color="primary"
-							onClick={() => handleOpenQuotes(row.original.dealer_id)}
-						>
-							<VisibilityIcon />
-						</IconButton>
-					</Tooltip>
-				),
-				enableEditing: false,
-			},
-		],
-		[validationErrors],
-	);
-
-	const { mutateAsync: createDealer } = useCreateDealer();
-	const {
-		data: fetchedDealers = [],
-		isError,
-		isLoading,
-		isFetching,
-	} = useGetDealers();
-	const { mutateAsync: updateDealer } = useUpdateDealer();
-	const { mutateAsync: deleteDealer } = useDeleteDealer();
-
-	const handleCreate: MRT_TableOptions<Dealer>["onCreatingRowSave"] = async ({
-		values,
-		table,
-	}) => {
-		const newValidationErrors = validateDealer(values);
-		if (Object.values(newValidationErrors).some(Boolean)) {
-			setValidationErrors(newValidationErrors);
-			return;
-		}
-		setValidationErrors({});
-
-		const updatedValues = {
-			...values,
-			is_important: values.is_important === 1 || values.is_important === "1",
-		};
-
-		await createDealer(updatedValues);
-		table.setCreatingRow(null);
+	const handleViewDetails = (d: Dealer) => {
+		setSelected(d);
+		setDetailOpen(true);
 	};
-
-	const handleUpdate: MRT_TableOptions<Dealer>["onEditingRowSave"] = async ({
-		values,
-		table,
-	}) => {
-		const newValidationErrors = validateDealer(values);
-		if (Object.values(newValidationErrors).some(Boolean)) {
-			setValidationErrors(newValidationErrors);
-			return;
-		}
-		setValidationErrors({});
-
-		const updatedValues = {
-			...values,
-			is_important: values.is_important === 1 || values.is_important === "1",
-		};
-
-		await updateDealer(updatedValues as Dealer);
-		table.setEditingRow(null);
-	};
-
-	const handleDelete = async (row: MRT_Row<Dealer>) => {
+	const handleDelete = async (d: Dealer) => {
 		try {
-			const response = await http.get(`/dealers/${row.original.dealer_id}/quotations/count`);
-			const data = response.data;
-
+			const { data } = await http.get(`/dealers/${d.dealer_id}/quotations/count`);
 			if (data.quotationCount > 0) {
 				window.alert("This dealer has existing quotations and cannot be deleted.");
 				return;
 			}
-
-			if (
-				window.confirm(
-					`Are you sure you want to delete dealer "${row.original.full_name}"?`,
-				)
-			) {
-				await deleteDealer(row.original.dealer_id);
+			if (window.confirm(`Delete dealer "${d.full_name}"?`)) {
+				await http.delete(`/dealers/${d.dealer_id}`);
+				setRows((prev) => prev.filter((r) => r.dealer_id !== d.dealer_id));
 			}
-		} catch (error) {
-			console.error("Error checking for quotations:", error);
-			window.alert("An error occurred while trying to delete the dealer. Please try again.");
+		} catch {
+			window.alert("Failed to delete dealer. Please try again.");
 		}
 	};
-	const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
+
+	/** Inline edit save */
+	const processRowUpdate = async (newRow: GridRowModel, oldRow: GridRowModel) => {
+		const id = String(newRow.dealer_id || newRow.id);
+		const patch: Partial<Dealer> = {};
+		(["full_name", "email", "phone", "location", "account_type"] as const).forEach((k) => {
+			if (newRow[k] !== oldRow[k]) (patch as any)[k] = newRow[k];
+		});
+		if (Object.keys(patch).length) {
+			await updateDealer(id, patch);
+			setRows((prev) => prev.map((r) => (r.dealer_id === id ? { ...r, ...patch } : r)));
+		}
+		return newRow;
+	};
+
+	/** DataGrid columns (desktop) */
+	const columns: GridColDef[] = [
+		{
+			field: "is_important",
+			headerName: "",
+			width: 56,
+			sortable: false,
+			filterable: false,
+			disableColumnMenu: true,
+			renderCell: (p) =>
+				Number(p.value) === 1 ? <StarIcon color="warning" fontSize="small" /> : <StarBorderIcon fontSize="small" />,
+		},
+		{
+			field: "full_name",
+			headerName: "Dealer",
+			flex: 1.6,
+			minWidth: 280, // bigger so it doesn't wrap
+			editable: true,
+			renderCell: (p) => {
+				const d = p.row as Dealer;
+				return (
+					<Box sx={{ display: "flex", alignItems: "center", minWidth: 0 }}>
+						<Avatar sx={{ width: 28, height: 28, mr: 1, bgcolor: "primary.main", fontSize: 12 }}>
+							{d.full_name?.[0] ?? "?"}
+						</Avatar>
+						<Box sx={{ minWidth: 0 }}>
+							<Typography
+								fontWeight={700}
+								noWrap
+								title={d.full_name}
+								sx={{ whiteSpace: "nowrap", lineHeight: 1.2 }}
+							>
+								{d.full_name}
+							</Typography>
+							{d.dealer_type && (
+								<Typography
+									noWrap
+									variant="caption"
+									color="text.secondary"
+									title={d.dealer_type}
+									sx={{ whiteSpace: "nowrap" }}
+								>
+									{d.dealer_type}
+								</Typography>
+							)}
+						</Box>
+					</Box>
+				);
+			},
+		},
+		{
+			field: "email",
+			headerName: "Email",
+			flex: 1.1,
+			minWidth: 200,
+			editable: true,
+			renderCell: (p) => (
+				<Box sx={{ display: "flex", alignItems: "center", minWidth: 0 }}>
+					<EmailIcon sx={{ fontSize: 14, mr: 0.5, color: "text.secondary" }} />
+					<Typography variant="body2" noWrap title={String(p.value ?? "")}>
+						{p.value}
+					</Typography>
+				</Box>
+			),
+		},
+		{
+			field: "phone",
+			headerName: "Phone",
+			flex: 1,
+			minWidth: 140,
+			editable: true,
+			renderCell: (p) => (
+				<Box sx={{ display: "flex", alignItems: "center", minWidth: 0 }}>
+					<PhoneIcon sx={{ fontSize: 14, mr: 0.5, color: "text.secondary" }} />
+					<Typography variant="body2" noWrap title={String(p.value ?? "")}>
+						{p.value}
+					</Typography>
+				</Box>
+			),
+		},
+		{
+			field: "location",
+			headerName: "Location",
+			flex: 1.1,
+			minWidth: 140,
+			editable: true,
+			renderCell: (p) => (
+				<Box sx={{ display: "flex", alignItems: "center", minWidth: 0 }}>
+					<PlaceIcon sx={{ fontSize: 14, mr: 0.5, color: "text.secondary" }} />
+					<Typography noWrap title={String(p.value ?? "")}>
+						{p.value}
+					</Typography>
+				</Box>
+			),
+		},
+		{
+			field: "account_type",
+			headerName: "Account",
+			flex: 1,
+			minWidth: 130,
+			editable: true,
+			renderCell: (p) => (
+				<Chip
+					label={p.value || "-"}
+					size="small"
+					color="primary"
+					variant="filled"
+					sx={{
+						height: 24,
+						"& .MuiChip-label": { px: 1, fontSize: 12, fontWeight: 600 },
+					}}
+				/>
+			),
+		},
+		{
+			field: "actions",
+			headerName: "Actions",
+			sortable: false,
+			filterable: false,
+			disableColumnMenu: true,
+			minWidth: 140,
+			flex: 0.9,
+			renderCell: (p) => {
+				const d = p.row as Dealer;
+				return (
+					<Box sx={{ display: "flex", gap: 0.5 }}>
+						<Tooltip title="View Quotes">
+							<IconButton size="small" color="primary" onClick={() => handleViewQuotes(d)}>
+								<VisibilityIcon fontSize="small" />
+							</IconButton>
+						</Tooltip>
+						<Tooltip title="Details">
+							<IconButton size="small" onClick={() => handleViewDetails(d)}>
+								<EditIcon fontSize="small" />
+							</IconButton>
+						</Tooltip>
+						<Tooltip title="Delete">
+							<IconButton size="small" color="error" onClick={() => handleDelete(d)}>
+								<DeleteIcon fontSize="small" />
+							</IconButton>
+						</Tooltip>
+					</Box>
+				);
+			},
+		},
+	];
+
+	const gridRows = useMemo(() => filtered.map((d) => ({ id: d.dealer_id, ...d })), [filtered]);
+
 	return (
 		<>
-			<MaterialReactTable
-				table={useMaterialReactTable({
-					columns,
-					data: fetchedDealers,
-					createDisplayMode: "modal",
-					editDisplayMode: "modal",
-					enableEditing: true,
-					getRowId: (row) => row.dealer_id,
-					muiToolbarAlertBannerProps: isError
-						? {
-							color: "error",
-							children: "Error loading dealers",
-						}
-						: undefined,
-					muiTableContainerProps: { sx: { minHeight: "500px" } },
-					onCreatingRowCancel: () => setValidationErrors({}),
-					onCreatingRowSave: handleCreate,
-					onEditingRowCancel: () => setValidationErrors({}),
-					onEditingRowSave: handleUpdate,
-					renderCreateRowDialogContent: ({
-						table,
-						row,
-						internalEditComponents,
-					}) => (
-						<>
-							<DialogTitle>Create Dealer</DialogTitle>
-							<DialogContent
-								sx={{ display: "flex", flexDirection: "column", gap: "1rem" }}
-							>
-								{internalEditComponents}
-							</DialogContent>
-							<DialogActions>
-								<MRT_EditActionButtons variant="text" table={table} row={row} />
-							</DialogActions>
-						</>
-					),
-					renderEditRowDialogContent: ({
-						table,
-						row,
-						internalEditComponents,
-					}) => (
-						<>
-							<DialogTitle>Edit Dealer</DialogTitle>
-							<DialogContent
-								sx={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}
-							>
-								{internalEditComponents}
-							</DialogContent>
-							<DialogActions>
-								<MRT_EditActionButtons variant="text" table={table} row={row} />
-							</DialogActions>
-						</>
-					),
-					renderRowActions: ({ row, table }) => (
-						<Box sx={{ display: "flex", gap: "1rem" }}>
-							<Tooltip title="Edit">
-								<IconButton onClick={() => table.setEditingRow(row)}>
-									<EditIcon />
-								</IconButton>
-							</Tooltip>
-							<Tooltip title="Delete">
-								<IconButton color="error" onClick={() => handleDelete(row)}>
-									<DeleteIcon />
-								</IconButton>
-							</Tooltip>
-						</Box>
-					),
-					renderTopToolbarCustomActions: ({ table }) => (
-						<Button
-							variant="contained"
-							onClick={() => table.setCreatingRow(true)}
-						>
-							Create New Dealer
-						</Button>
-					),
-					state: {
-						isLoading,
-						isSaving: false,
-						showAlertBanner: isError,
-						showProgressBars: isFetching,
-						pagination, 
-					},
-					onPaginationChange: setPagination,
-					autoResetPageIndex: false,
-				})}
-			/>
-			<Dialog
-				open={quoteModalOpen}
-				onClose={() => setQuoteModalOpen(false)}
-				fullWidth
-				maxWidth="lg"
+			<Paper
+				sx={{
+					position: "fixed",
+					left: isMobile ? 0 : "var(--app-drawer-width, 240px)",
+					top: "var(--app-header-height, 56px)",
+					right: 0,
+					bottom: 0,
+					display: "flex",
+					flexDirection: "column",
+					borderRadius: 2,
+					boxShadow: 3,
+					overflow: "hidden",
+					bgcolor: "background.paper",
+				}}
 			>
-				<DialogTitle
-					sx={{
-						bgcolor: 'primary.main',
-						color: 'white',
-						fontWeight: 'bold',
-						fontSize: '1.25rem',
-						textAlign: 'center',
-						letterSpacing: 1,
-					}}
-				>
-					Quotations for Dealer
-				</DialogTitle>
+				{/* TOP BAR */}
+				<AppBar position="static" color="transparent" elevation={0} sx={{ flex: "0 0 auto" }}>
+					<Toolbar sx={{ minHeight: 56, gap: 1, justifyContent: "space-between" }}>
+						<Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
+							<TextField
+								value={search}
+								onChange={(e) => setSearch(e.target.value)}
+								size="medium"
+								placeholder="Search dealers..."
+								InputProps={{
+									startAdornment: (
+										<InputAdornment position="start">
+											<SearchIcon fontSize="small" />
+										</InputAdornment>
+									),
+								}}
+								sx={{ width: { xs: 220, sm: 320, md: 420 } }}
+							/>
+							<Button
+								startIcon={<AddIcon />}
+								variant="contained"
+								sx={{
+									textTransform: "none",
+									fontWeight: 700,
+								}}
+							>
+								New Dealer
+							</Button>
+						</Box>
 
-				<DialogContent>
-					{selectedDealerId ? (
-						<QuotationPage dealerId={selectedDealerId} />
+						{/* Filter (right) */}
+						<Tooltip title="Open column filters">
+							<IconButton
+								size="small"
+								onClick={() => {
+									const el = document.querySelector('[data-testid="Open filter panel"]') as HTMLElement | null;
+									el?.click();
+								}}
+							>
+								<FilterListIcon />
+							</IconButton>
+						</Tooltip>
+					</Toolbar>
+				</AppBar>
+
+				{/* CONTENT */}
+				<Box sx={{ flex: "1 1 auto", minHeight: 0, overflow: "auto", p: 1.25 }}>
+					{error && (
+						<Typography color="error" sx={{ mb: 1 }}>
+							{error}
+						</Typography>
+					)}
+
+					{!isMobile ? (
+						<DataGrid
+							columns={columns}
+							rows={gridRows}
+							loading={loading}
+							editMode="row"
+							processRowUpdate={processRowUpdate}
+							onProcessRowUpdateError={(err) => console.error(err)}
+							disableColumnMenu
+							rowSelection={false}
+							hideFooter
+							slots={{ toolbar: GridToolbar }}
+							slotProps={{ toolbar: { showQuickFilter: false } }}
+							// Bigger + colourful styling
+							columnHeaderHeight={52}
+							rowHeight={56}
+							sx={{
+								borderRadius: 2,
+								backgroundColor: "background.paper",
+								fontSize: ".95rem",
+								"& .MuiDataGrid-columnHeaders": {
+									fontWeight: 800,
+									background:
+                    "linear-gradient(90deg, rgba(7,71,166,0.07) 0%, rgba(7,71,166,0.03) 100%)",
+								},
+								"& .MuiDataGrid-columnHeaderTitle": { fontWeight: 800 },
+								"& .MuiDataGrid-cell": {
+									whiteSpace: "nowrap",
+									overflow: "hidden",
+									textOverflow: "ellipsis",
+								},
+								"& .MuiDataGrid-row:nth-of-type(even)": {
+									backgroundColor: "rgba(0,0,0,0.02)",
+								},
+								"& .MuiDataGrid-row:hover": {
+									backgroundColor: "rgba(7,71,166,0.06)",
+								},
+							}}
+							autoHeight={gridRows.length <= 14}
+						/>
+					) : (
+					// mobile cards unchanged
+						<Box
+							sx={{
+								overflowY: "auto",
+								height: "100%",
+								pr: 0.5,
+								"&::-webkit-scrollbar": { width: 6 },
+								"&::-webkit-scrollbar-thumb": { background: theme.palette.grey[400], borderRadius: 3 },
+							}}
+						>
+							<Grid container spacing={1}>
+								{filtered.map((d) => (
+									<Grid item xs={12} key={d.dealer_id}>
+										<Card variant="outlined" sx={{ borderRadius: 2 }}>
+											<CardContent sx={{ py: 1.25 }}>
+												<Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+													<Avatar sx={{ width: 32, height: 32, mr: 1, bgcolor: "primary.main" }}>
+														{d.full_name?.[0] ?? "?"}
+													</Avatar>
+													<Box sx={{ minWidth: 0, flex: 1 }}>
+														<Typography fontWeight={700} noWrap title={d.full_name}>
+															{d.full_name}
+														</Typography>
+														<Typography variant="caption" color="text.secondary" noWrap>
+															{d.dealer_type}
+														</Typography>
+													</Box>
+													{Number(d.is_important) === 1 ? (
+														<StarIcon color="warning" fontSize="small" />
+													) : (
+														<StarBorderIcon fontSize="small" />
+													)}
+												</Box>
+
+												<Box sx={{ display: "flex", alignItems: "center", mb: 0.5 }}>
+													<EmailIcon sx={{ fontSize: 14, mr: 0.5, color: "text.secondary" }} />
+													<Typography variant="body2" noWrap title={d.email}>
+														{d.email}
+													</Typography>
+												</Box>
+												<Box sx={{ display: "flex", alignItems: "center", mb: 0.5 }}>
+													<PhoneIcon sx={{ fontSize: 14, mr: 0.5, color: "text.secondary" }} />
+													<Typography variant="body2" noWrap title={d.phone}>
+														{d.phone}
+													</Typography>
+												</Box>
+												<Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+													<PlaceIcon sx={{ fontSize: 14, mr: 0.5, color: "text.secondary" }} />
+													<Typography variant="body2" noWrap title={d.location}>
+														{d.location}
+													</Typography>
+												</Box>
+
+												<Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+													<Chip
+														label={d.account_type || "-"}
+														size="small"
+														color="primary"
+														variant="filled"
+														sx={{ height: 22, "& .MuiChip-label": { px: 0.75, fontSize: 11 } }}
+													/>
+													<Box sx={{ flex: 1 }} />
+													<Tooltip title="Quotes">
+														<IconButton size="small" color="primary" onClick={() => handleViewQuotes(d)}>
+															<VisibilityIcon fontSize="small" />
+														</IconButton>
+													</Tooltip>
+													<Tooltip title="Details">
+														<IconButton size="small" onClick={() => handleViewDetails(d)}>
+															<EditIcon fontSize="small" />
+														</IconButton>
+													</Tooltip>
+													<Tooltip title="Delete">
+														<IconButton size="small" color="error" onClick={() => handleDelete(d)}>
+															<DeleteIcon fontSize="small" />
+														</IconButton>
+													</Tooltip>
+												</Box>
+											</CardContent>
+										</Card>
+									</Grid>
+								))}
+							</Grid>
+						</Box>
+					)}
+				</Box>
+			</Paper>
+
+			{/* Details dialog */}
+			<Dialog
+				open={detailOpen}
+				onClose={() => setDetailOpen(false)}
+				fullWidth
+				maxWidth="md"
+				PaperProps={{ sx: { borderRadius: 2 } }}
+			>
+				<DialogTitle sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+					<Typography variant="h6">Dealer Details</Typography>
+					<IconButton onClick={() => setDetailOpen(false)} size="small">
+						<CloseIcon />
+					</IconButton>
+				</DialogTitle>
+				<DialogContent dividers>
+					{selected ? (
+						<Box>
+							<Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+								<Avatar sx={{ width: 56, height: 56, mr: 2, bgcolor: "primary.main" }}>
+									{selected.full_name?.[0] ?? "?"}
+								</Avatar>
+								<Box>
+									<Typography variant="h6">
+										{selected.full_name}
+										{Number(selected.is_important) === 1 && (
+											<StarIcon color="warning" sx={{ ml: 1, verticalAlign: "text-bottom" }} />
+										)}
+									</Typography>
+									<Chip label={selected.dealer_type || "-"} size="small" />
+								</Box>
+							</Box>
+
+							<Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} sx={{ mb: 1 }}>
+								<Tab label="Overview" />
+								<Tab label="Details" />
+							</Tabs>
+
+							{activeTab === 0 && (
+								<Grid container spacing={2}>
+									<Grid item xs={12} sm={6}>
+										<Card variant="outlined">
+											<CardContent>
+												<Typography variant="subtitle1" sx={{ display: "flex", alignItems: "center" }}>
+													<PersonIcon sx={{ mr: 1 }} /> Contact Information
+												</Typography>
+												<Box sx={{ mt: 1 }}>
+													<Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+														<EmailIcon sx={{ mr: 1, color: "text.secondary" }} />
+														<Typography>{selected.email}</Typography>
+													</Box>
+													<Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+														<PhoneIcon sx={{ mr: 1, color: "text.secondary" }} />
+														<Typography>{selected.phone}</Typography>
+													</Box>
+													<Box sx={{ display: "flex", alignItems: "center" }}>
+														<PlaceIcon sx={{ mr: 1, color: "text.secondary" }} />
+														<Typography>{selected.location}</Typography>
+													</Box>
+												</Box>
+											</CardContent>
+										</Card>
+									</Grid>
+									<Grid item xs={12} sm={6}>
+										<Card variant="outlined">
+											<CardContent>
+												<Typography variant="subtitle1" sx={{ display: "flex", alignItems: "center" }}>
+													<BusinessIcon sx={{ mr: 1 }} /> Account Information
+												</Typography>
+												<Box sx={{ mt: 1 }}>
+													<Chip label={selected.account_type || "-"} size="small" variant="outlined" />
+													{selected.gst_number && (
+														<Typography sx={{ mt: 1 }}>GST: {selected.gst_number}</Typography>
+													)}
+													<Typography sx={{ mt: 1 }}>
+														Since: {new Date(selected.date_created).toLocaleDateString()}
+													</Typography>
+												</Box>
+											</CardContent>
+										</Card>
+									</Grid>
+								</Grid>
+							)}
+
+							{activeTab === 1 && (
+								<Grid container spacing={2}>
+									<Grid item xs={12} sm={6}>
+										<TextField fullWidth label="Full Name" value={selected.full_name} InputProps={{ readOnly: true }} />
+									</Grid>
+									<Grid item xs={12} sm={6}>
+										<TextField fullWidth label="Email" value={selected.email} InputProps={{ readOnly: true }} />
+									</Grid>
+									<Grid item xs={12} sm={6}>
+										<TextField fullWidth label="Phone" value={selected.phone} InputProps={{ readOnly: true }} />
+									</Grid>
+									<Grid item xs={12} sm={6}>
+										<TextField fullWidth label="Location" value={selected.location} InputProps={{ readOnly: true }} />
+									</Grid>
+									<Grid item xs={12} sm={6}>
+										<TextField fullWidth label="Dealer Type" value={selected.dealer_type || ""} InputProps={{ readOnly: true }} />
+									</Grid>
+									<Grid item xs={12} sm={6}>
+										<TextField fullWidth label="Account Type" value={selected.account_type || ""} InputProps={{ readOnly: true }} />
+									</Grid>
+								</Grid>
+							)}
+						</Box>
 					) : (
 						<Typography>No dealer selected</Typography>
 					)}
 				</DialogContent>
 				<DialogActions>
-					<Button onClick={() => setQuoteModalOpen(false)}>Close</Button>
+					<Button onClick={() => setDetailOpen(false)} variant="outlined">
+						Close
+					</Button>
+				</DialogActions>
+			</Dialog>
+
+			{/* Quotes dialog */}
+			<Dialog
+				open={quoteOpen}
+				onClose={() => setQuoteOpen(false)}
+				fullWidth
+				maxWidth="xl"
+				PaperProps={{ sx: { borderRadius: 2, minHeight: "80vh" } }}
+			>
+				<DialogTitle
+					sx={{
+						bgcolor: "primary.main",
+						color: "white",
+						fontWeight: "bold",
+						textAlign: "center",
+						py: 1.25,
+					}}
+				>
+					Quotations for {selected?.full_name}
+				</DialogTitle>
+				<DialogContent sx={{ p: 0 }}>
+					{selected ? (
+						<QuotationPage dealerId={selected.dealer_id} />
+					) : (
+						<Box sx={{ p: 3, textAlign: "center" }}>
+							<Typography>No dealer selected</Typography>
+						</Box>
+					)}
+				</DialogContent>
+				<DialogActions sx={{ p: 2 }}>
+					<Button onClick={() => setQuoteOpen(false)} variant="outlined">
+						Close
+					</Button>
 				</DialogActions>
 			</Dialog>
 		</>
-	);
-};
-
-function useGetDealers() {
-	return useQuery<Dealer[]>({
-		queryKey: ["dealers"],
-		queryFn: async () => {
-			const res = await http.get('/dealers');
-			return res.data;
-		},
-		refetchOnWindowFocus: false,
-	});
-}
-
-// Hook: CREATE Dealer
-function useCreateDealer() {
-	const queryClient = useQueryClient();
-	return useMutation({
-		mutationFn: async (dealer: Partial<Dealer>) => {
-			await http.post('/dealers', dealer);
-		},
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ["dealers"] });
-		},
-	});
-}
-
-// Hook: UPDATE Dealer
-function useUpdateDealer() {
-	const queryClient = useQueryClient();
-	return useMutation({
-		mutationFn: async (dealer: Dealer) => {
-			await http.put(`/dealers/${dealer.dealer_id}`, dealer);
-		},
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ["dealers"] });
-		},
-	});
-}
-
-// Hook: DELETE Dealer
-function useDeleteDealer() {
-	const queryClient = useQueryClient();
-	return useMutation({
-		mutationFn: async (dealerId: string) => {
-			await http.delete(`/dealers/${dealerId}`);
-		},
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ["dealers"] });
-		},
-	});
-}
-
-// Validation logic
-function validateDealer(dealer: Partial<Dealer>) {
-	return {
-		full_name: !dealer.full_name ? "Full name is required" : "",
-		email: !validateEmail(dealer.email || "") ? "Invalid email" : "",
-	};
-}
-
-function validateEmail(email: string) {
-	return !!email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/);
-}
-
-const queryClient = new QueryClient();
-
-export default function DealerApp() {
-	return (
-		<QueryClientProvider client={queryClient}>
-			<DealerTable />
-		</QueryClientProvider>
 	);
 }

@@ -1,21 +1,45 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from "react";
 import {
-	MaterialReactTable,
-	type MRT_ColumnDef,
-	useMaterialReactTable,
-} from 'material-react-table';
-import {
+	AppBar,
+	Avatar,
 	Box,
-	Typography,
-	MenuItem,
-	Select,
+	Button,
+	Card,
+	CardContent,
+	Chip,
+	Dialog,
+	DialogActions,
+	DialogContent,
+	DialogTitle,
+	Grid,
+	IconButton,
+	InputAdornment,
+	Paper,
+	Tab,
+	Tabs,
 	TextField,
-	Snackbar,
-	Alert,
-} from '@mui/material';
-import { http } from '../lib/http';
-import { useNavigate } from 'react-router-dom';
+	Toolbar,
+	Tooltip,
+	Typography,
+	useMediaQuery,
+	useTheme,
+} from "@mui/material";
+import {
+	DataGrid,
+	GridColDef,
+	GridRowModel,
+	GridToolbar,
+} from "@mui/x-data-grid";
+import SearchIcon from "@mui/icons-material/Search";
+import EditIcon from "@mui/icons-material/Edit";
+//import DeleteIcon from "@mui/icons-material/Delete";
+//import AddIcon from "@mui/icons-material/Add";
+import FilterListIcon from "@mui/icons-material/FilterList";
+import CloseIcon from "@mui/icons-material/Close";
+import { http } from "../lib/http";
+import { useNavigate } from "react-router-dom";
 
+/** Types */
 type FollowUp = {
   followup_id: string;
   entity_type: 'order' | 'quote' | 'sr';
@@ -29,83 +53,93 @@ type FollowUp = {
   notes: string | null;
 }
 
-type User = {
-  user_id: number;
-  full_name: string;
+/** API helpers */
+async function fetchFollowUps(): Promise<FollowUp[]> {
+	const userRole = localStorage.getItem('userRole');
+	const userId = localStorage.getItem('user_id');
+	let url = `/followups?userRole=${userRole}`;
+	if (userRole?.toLowerCase() === 'Employee'.toLowerCase()) {
+		url = `/followups?userRole=${userRole}&userId=${userId}`;
+	}
+	const { data } = await http.get(url);
+	return data ?? [];
+}
+async function updateFollowUp(id: string, patch: Partial<FollowUp>) {
+	await http.put(`/followups/${id}`, patch);
 }
 
-const FollowUpScreen = () => {
-	const [followups, setFollowups] = useState<FollowUp[]>([]);
-	const [users, setUsers] = useState<User[]>([]);
-	const [pagination, setPagination] = useState({
-		pageIndex: 0,
-		pageSize: 6,
-	});
-	const [snackbarOpen, setSnackbarOpen] = useState(false);
+export default function FollowUpScreen() {
+	const theme = useTheme();
+	const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+	const navigate = useNavigate();
+
+	const [rows, setRows] = useState<FollowUp[]>([]);
+	const [loading, setLoading] = useState(true);
+	const [error, setError] = useState<string | null>(null);
+	const [search, setSearch] = useState("");
+
+	// dialogs
+	const [detailOpen, setDetailOpen] = useState(false);
+	const [activeTab, setActiveTab] = useState(0);
+	const [selected, setSelected] = useState<FollowUp | null>(null);
 
 	useEffect(() => {
-		fetchFollowUps();
-		fetchUsers();
+		(async () => {
+			try {
+				setLoading(true);
+				setRows(await fetchFollowUps());
+				setError(null);
+			} catch {
+				setError("Failed to load follow-ups.");
+			} finally {
+				setLoading(false);
+			}
+		})();
 	}, []);
-	const statusStyles = {
-		Completed: {
-			backgroundColor: '#e8f5e9', // Light green
-			'&:hover': {
-				backgroundColor: '#c8e6c9', // Slightly darker green on hover
-			},
-		},
-		Pending: {
-			backgroundColor: '#fff8e1', // Light yellow
-			'&:hover': {
-				backgroundColor: '#ffecb3', // Slightly darker yellow on hover
-			},
-		},
-		'In Progress': {
-			backgroundColor: '#e3f2fd', // Light blue
-			'&:hover': {
-				backgroundColor: '#bbdefb', // Slightly darker blue on hover
-			},
-		},
+
+	const filtered = useMemo(() => {
+		const q = search.trim().toLowerCase();
+		if (!q) return rows;
+		return rows.filter((d) =>
+			[d.followup_id, d.entity_type, d.entity_id, d.status]
+				.filter(Boolean)
+				.some((v) => String(v).toLowerCase().includes(q))
+		);
+	}, [rows, search]);
+
+	const handleViewDetails = (d: FollowUp) => {
+		setSelected(d);
+		setDetailOpen(true);
 	};
 
-	const fetchFollowUps = async () => {
-		const userRole = localStorage.getItem('userRole');
-		const userId = localStorage.getItem('user_id');
-		let url = `/followups?userRole=${userRole}`;
-		if (userRole?.toLowerCase() === 'Employee'.toLowerCase()) {
-			url = `/followups?userRole=${userRole}&userId=${userId}`;
-		}
-		const res = await http.get(url);
-		setFollowups(res.data);
-	};
-
-	const fetchUsers = async () => {
-		const res = await http.get('/userMgmt/usersList');
-		setUsers(res.data);
-	};
-
-	const handleUpdate = async (values: FollowUp) => {
-		const res = await http.put(`/followups/${values.followup_id}`, {
-			status: values.status,
-			assigned_to: values.assigned_to,
-			due_date: values.due_date || null,
-			notes: values.notes || null,
+	/** Inline edit save */
+	const processRowUpdate = async (newRow: GridRowModel, oldRow: GridRowModel) => {
+		const id = String(newRow.followup_id);
+		const patch: Partial<FollowUp> = {};
+		([
+			"assigned_to",
+			"status",
+			"due_date",
+			"notes",
+		] as const).forEach((k) => {
+			if (newRow[k] !== oldRow[k]) (patch as any)[k] = newRow[k];
 		});
-
-		if (res.status === 200) {
-			setSnackbarOpen(true);
-		} else {
-			console.error("Update failed");
+		if (Object.keys(patch).length) {
+			await updateFollowUp(id, patch);
+			setRows((prev) => prev.map((r) => (r.followup_id === id ? { ...r, ...patch } : r)));
 		}
+		return newRow;
 	};
 
-	const navigate = useNavigate();
-	const columns: MRT_ColumnDef<FollowUp>[] = [
+	/** DataGrid columns (desktop) */
+	const columns: GridColDef[] = [
 		{
-			accessorKey: 'followup_id',
-			header: 'Follow-Up ID',
-			Cell: ({ row }) => {
-				const { entity_type, entity_id } = row.original;
+			field: "followup_id",
+			headerName: "Follow-Up ID",
+			flex: 1,
+			minWidth: 150,
+			renderCell: (p) => {
+				const { entity_type, entity_id } = p.row as FollowUp;
 				let path = '';
 				if (entity_type === 'quote') {
 					path = `/quotation-items/${entity_id}`;
@@ -114,204 +148,246 @@ const FollowUpScreen = () => {
 				} else if (entity_type === 'lr') {
 					path = `/lr-item?id=${entity_id}`;
 				}
-
-				return (
-					<Typography
-						variant="body2"
-						component="a"
-						href={path}
-						onClick={(e) => {
-							e.preventDefault();
-							navigate(path);
-						}}
-						sx={{
-							cursor: 'pointer',
-							textDecoration: 'underline',
-							color: 'primary.main',
-							'&:hover': {
-								color: 'primary.dark',
-							},
-						}}
-					>
-						{row.original.followup_id}
-					</Typography>
-				);
-			},
+				return <Button onClick={() => navigate(path)}>{p.value}</Button>
+			}
 		},
 		{
-			accessorKey: 'entity_type',
-			header: 'Entity Type',
-			Cell: ({ row }) => {
-				const { entity_type } = row.original;
-				return (
-					<Typography variant="body2">
-						{entity_type === 'order' ? 'lr' : entity_type}
-					</Typography>
-				);
-			},
+			field: "entity_type",
+			headerName: "Entity Type",
+			flex: 1,
+			minWidth: 150,
 		},
 		{
-			accessorKey: 'entity_id',
-			header: 'Related-ID',
-			Cell: ({ row }) => {
-				const { entity_type, entity_id, invoice_id, lr_number } = row.original;
-				let displayId = entity_id;
-				if (entity_type === 'sr' && invoice_id) {
-					displayId = invoice_id;
-				} else if ((entity_type === 'lr' || entity_type === 'order') && lr_number) {
-					displayId = lr_number;
-				}
-				return <Typography variant="body2">{displayId}</Typography>;
-			},
+			field: "entity_id",
+			headerName: "Entity ID",
+			flex: 1,
+			minWidth: 150,
 		},
 		{
-			accessorKey: 'assigned_to',
-			header: 'Assigned To',
-			Cell: ({ row }) => {
-				const [isAdmin, setIsAdmin] = useState(false);
-
-				useEffect(() => {
-					const checkAdmin = async () => {
-						const role = await getUserRole();
-						setIsAdmin(role === 'Admin');
-					};
-					checkAdmin();
-				}, []);
-
-				return (
-					<Select
-						size="small"
-						value={Number(row.original.assigned_to)}
-						disabled={!isAdmin}
-						onChange={(e) => {
-							if (!isAdmin) {
-								alert('⚠️ Only Admin can change assigned user!');
-								return;
-							}
-							const updatedRow = {
-								...row.original,
-								assigned_to: Number(e.target.value),
-							};
-							setFollowups((prev) =>
-								prev.map((fu) =>
-									fu.followup_id === updatedRow.followup_id ? updatedRow : fu
-								)
-							);
-						}}
-						onBlur={() => handleUpdate(row.original)}
-					>
-						{users.map((user) => (
-							<MenuItem key={user.user_id} value={user.user_id}>
-								{user.full_name}
-							</MenuItem>
-						))}
-					</Select>
-				);
-			},
-		},
-		{
-			accessorKey: 'status',
-			header: 'Status',
-			Cell: ({ row }) => (
-				<Select
+			field: "status",
+			headerName: "Status",
+			flex: 1,
+			minWidth: 120,
+			editable: true,
+			renderCell: (p) => (
+				<Chip
+					label={p.value || "-"}
 					size="small"
-					value={row.original.status}
-					onChange={(e) => {
-						const updatedRow = {
-							...row.original,
-							status: e.target.value as FollowUp['status'],
-						};
-						setFollowups((prev) =>
-							prev.map((fu) =>
-								fu.followup_id === updatedRow.followup_id ? updatedRow : fu
-							)
-						);
+					color={p.value === "Completed" ? "success" : p.value === "Pending" ? "warning" : "info"}
+					variant="filled"
+					sx={{
+						height: 24,
+						"& .MuiChip-label": { px: 1, fontSize: 12, fontWeight: 600 },
 					}}
-					onBlur={() => handleUpdate(row.original)}
-				>
-					<MenuItem value="Pending">Pending</MenuItem>
-					<MenuItem value="In Progress">In Progress</MenuItem>
-					<MenuItem value="Completed">Completed</MenuItem>
-				</Select>
-			),
-		},
-		{
-			accessorKey: 'due_date',
-			header: 'Due Date',
-			Cell: ({ row }) => {
-				const displayDate = row.original.due_date
-					? row.original.due_date.slice(0, 10) // Ensure YYYY-MM-DD
-					: '';
-				return (
-					<TextField
-						size="small"
-						type="date"
-						value={displayDate}
-						onChange={(e) => {
-							const updatedRow = { ...row.original, due_date: e.target.value };
-							setFollowups((prev) =>
-								prev.map((fu) =>
-									fu.followup_id === updatedRow.followup_id ? updatedRow : fu
-								)
-							);
-						}}
-						onBlur={() => handleUpdate(row.original)}
-					/>
-				);
-			},
-		},
-		{
-			accessorKey: 'notes',
-			header: 'Notes',
-			Cell: ({ row }) => (
-				<TextField
-					size="small"
-					value={row.original.notes || ''}
-					onChange={(e) => {
-						const updatedRow = { ...row.original, notes: e.target.value };
-						setFollowups((prev) =>
-							prev.map((fu) =>
-								fu.followup_id === updatedRow.followup_id ? updatedRow : fu
-							)
-						);
-					}}
-					onBlur={() => handleUpdate(row.original)}
 				/>
 			),
 		},
+		{
+			field: "actions",
+			headerName: "Actions",
+			sortable: false,
+			filterable: false,
+			disableColumnMenu: true,
+			minWidth: 100,
+			flex: 0.9,
+			renderCell: (p) => {
+				const d = p.row as FollowUp;
+				return (
+					<Box sx={{ display: "flex", gap: 0.5 }}>
+						<Tooltip title="Details">
+							<IconButton size="small" onClick={() => handleViewDetails(d)}>
+								<EditIcon fontSize="small" />
+							</IconButton>
+						</Tooltip>
+					</Box>
+				);
+			},
+		},
 	];
 
-	const table = useMaterialReactTable({
-		columns,
-		data: followups,
-		state: { pagination },
-		onPaginationChange: setPagination,
-		manualPagination: false,
-		autoResetPageIndex: false,
-		muiTableBodyRowProps: ({ row }) => ({
-			sx: statusStyles[row.original.status as keyof typeof statusStyles],
-		}),
-	});
+	const gridRows = useMemo(() => filtered.map((d) => ({ id: d.followup_id, ...d })), [filtered]);
 
 	return (
 		<>
-			<Box>
-				<Typography variant="h5" align="center" gutterBottom>
-					Follow-Up Tracker
-				</Typography>
-				<MaterialReactTable table={table} />
-			</Box>
-			<Snackbar
-				open={snackbarOpen}
-				autoHideDuration={3000}
-				onClose={() => setSnackbarOpen(false)}
+			<Paper
+				sx={{
+					position: "fixed",
+					left: isMobile ? 0 : "var(--app-drawer-width, 240px)",
+					top: "var(--app-header-height, 56px)",
+					right: 0,
+					bottom: 0,
+					display: "flex",
+					flexDirection: "column",
+					borderRadius: 2,
+					boxShadow: 3,
+					overflow: "hidden",
+					bgcolor: "background.paper",
+				}}
 			>
-				<Alert severity="success" onClose={() => setSnackbarOpen(false)}>
-					Update saved successfully!
-				</Alert>
-			</Snackbar>
+				{/* TOP BAR */}
+				<AppBar position="static" color="transparent" elevation={0} sx={{ flex: "0 0 auto" }}>
+					<Toolbar sx={{ minHeight: 56, gap: 1, justifyContent: "space-between" }}>
+						<Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
+							<TextField
+								value={search}
+								onChange={(e) => setSearch(e.target.value)}
+								size="medium"
+								placeholder="Search..."
+								InputProps={{
+									startAdornment: (
+										<InputAdornment position="start">
+											<SearchIcon fontSize="small" />
+										</InputAdornment>
+									),
+								}}
+								sx={{ width: { xs: 220, sm: 320, md: 420 } }}
+							/>
+						</Box>
+
+						{/* Filter (right) */}
+						<Tooltip title="Open column filters">
+							<IconButton
+								size="small"
+								onClick={() => {
+									const el = document.querySelector('[data-testid="Open filter panel"]') as HTMLElement | null;
+									el?.click();
+								}}
+							>
+								<FilterListIcon />
+							</IconButton>
+						</Tooltip>
+					</Toolbar>
+				</AppBar>
+
+				{/* CONTENT */}
+				<Box sx={{ flex: "1 1 auto", minHeight: 0, overflow: "auto", p: 1.25 }}>
+					{error && (
+						<Typography color="error" sx={{ mb: 1 }}>
+							{error}
+						</Typography>
+					)}
+
+					{!isMobile ? (
+						<DataGrid
+							columns={columns}
+							rows={gridRows}
+							loading={loading}
+							editMode="row"
+							processRowUpdate={processRowUpdate}
+							onProcessRowUpdateError={(err) => console.error(err)}
+							disableColumnMenu
+							rowSelection={false}
+							hideFooter
+							slots={{ toolbar: GridToolbar }}
+							slotProps={{ toolbar: { showQuickFilter: false } }}
+							columnHeaderHeight={52}
+							rowHeight={56}
+							sx={{
+								borderRadius: 2,
+								backgroundColor: "background.paper",
+								fontSize: ".95rem",
+								"& .MuiDataGrid-columnHeaders": {
+									fontWeight: 800,
+									background:
+                    "linear-gradient(90deg, rgba(7,71,166,0.07) 0%, rgba(7,71,166,0.03) 100%)",
+								},
+								"& .MuiDataGrid-columnHeaderTitle": { fontWeight: 800 },
+								"& .MuiDataGrid-cell": {
+									whiteSpace: "nowrap",
+									overflow: "hidden",
+									textOverflow: "ellipsis",
+								},
+								"& .MuiDataGrid-row:nth-of-type(even)": {
+									backgroundColor: "rgba(0,0,0,0.02)",
+								},
+								"& .MuiDataGrid-row:hover": {
+									backgroundColor: "rgba(7,71,166,0.06)",
+								},
+							}}
+							autoHeight={gridRows.length <= 14}
+						/>
+					) : (
+						<Box
+							sx={{
+								overflowY: "auto",
+								height: "100%",
+								pr: 0.5,
+								"&::-webkit-scrollbar": { width: 6 },
+								"&::-webkit-scrollbar-thumb": { background: theme.palette.grey[400], borderRadius: 3 },
+							}}
+						>
+							<Grid container spacing={1}>
+								{filtered.map((d) => (
+									<Grid item xs={12} key={d.followup_id}>
+										<Card variant="outlined" sx={{ borderRadius: 2 }}>
+											<CardContent sx={{ py: 1.25 }}>
+												<Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+													<Avatar sx={{ width: 32, height: 32, mr: 1, bgcolor: "primary.main" }}>
+														{d.followup_id?.[0] ?? "?"}
+													</Avatar>
+													<Box sx={{ minWidth: 0, flex: 1 }}>
+														<Typography fontWeight={700} noWrap title={d.followup_id}>
+															{d.followup_id}
+														</Typography>
+														<Typography variant="caption" color="text.secondary" noWrap>
+															{d.entity_type}
+														</Typography>
+													</Box>
+												</Box>
+											</CardContent>
+										</Card>
+									</Grid>
+								))}
+							</Grid>
+						</Box>
+					)}
+				</Box>
+			</Paper>
+
+			{/* Details dialog */}
+			<Dialog
+				open={detailOpen}
+				onClose={() => setDetailOpen(false)}
+				fullWidth
+				maxWidth="md"
+				PaperProps={{ sx: { borderRadius: 2 } }}
+			>
+				<DialogTitle sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+					<Typography variant="h6">Follow-Up Details</Typography>
+					<IconButton onClick={() => setDetailOpen(false)} size="small">
+						<CloseIcon />
+					</IconButton>
+				</DialogTitle>
+				<DialogContent dividers>
+					{selected ? (
+						<Box>
+							<Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} sx={{ mb: 1 }}>
+								<Tab label="Overview" />
+								<Tab label="Details" />
+							</Tabs>
+
+							{activeTab === 0 && (
+								<Grid container spacing={2}>
+									{/* Overview content here */}
+								</Grid>
+							)}
+
+							{activeTab === 1 && (
+								<Grid container spacing={2}>
+									{/* Details content here */}
+								</Grid>
+							)}
+						</Box>
+					) : (
+						<Typography>No follow-up selected</Typography>
+					)}
+				</DialogContent>
+				<DialogActions>
+					<Button onClick={() => setDetailOpen(false)} variant="outlined">
+						Close
+					</Button>
+				</DialogActions>
+			</Dialog>
 		</>
 	);
-};
-
-export default FollowUpScreen;
+}
