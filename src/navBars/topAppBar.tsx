@@ -23,7 +23,7 @@ import MenuOpenIcon from "@mui/icons-material/MenuOpen";
 import LogoutIcon from "@mui/icons-material/Logout";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import { useNavigate, useLocation, Outlet } from "react-router-dom";
-import { navIcons, type NavItem } from "./navicons";
+import { navIcons, type NavItem } from "./navIcons";
 import aquapotLogo from "../images/aquapot-logo-r.jpg";
 import { http } from "../lib/http";
 import { clearSessionCache, getUserName } from "../services/AuthService";
