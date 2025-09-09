@@ -67,6 +67,12 @@ app.use('/api/logout', logoutRouter);
 const sessionRouter = require('./routes/session');
 app.use('/api/session', sessionRouter); // ← was `app.use('/api', sessionRouter)`; narrow to /api/session
 
+const tenantRegistrationRouter = require('./routes/tenantRegistration');
+app.use('/api/tenants', tenantRegistrationRouter);
+
+const invitationsPublicRouter = require('./routes/invitationsPublic');
+app.use('/api/invitations', invitationsPublicRouter);
+
 // ------------- 4) PROTECT EVERYTHING ELSE UNDER /api -------------
 app.use('/api', verifyToken);
 
@@ -76,6 +82,10 @@ app.use(activityLogger);
 
 // ------------- 5) PROTECTED ROUTES -------------
 // Keep everything under /api/* so verifyToken runs
+
+// Invitations (Protected)
+const invitationsRouter = require('./routes/invitations');
+app.use('/api/invitations', invitationsRouter);
 
 // Account Types
 const accountTypesRouter = require('./routes/accountTypes')(db);
