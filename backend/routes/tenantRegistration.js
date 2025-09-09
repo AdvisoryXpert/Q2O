@@ -154,20 +154,33 @@ router.post('/register', (req, res) => {
                       });
                     }
 
-                    connection.commit((err) => {
-                      if (err) {
-                        return connection.rollback(() => {
-                          connection.release();
-                          res.status(500).json({ error: 'An error occurred during registration.', details: err.message });
-                        });
-                      }
+                    const user_id = userResult.insertId;
+                    const all_permissions = ['Contacts', 'Followup', 'Home', 'LR Item', 'Notes', 'Orders', 'POS', 'PricingAdmin', 'ProductAdmin', 'Quotes', 'Site Map', 'SR', 'UserAdmin', 'Warranty'];
+                    const userAccessValues = all_permissions.map(permission => [tenant_id, user_id, permission, 'Admin']);
 
-                      connection.release();
-                      res.status(201).json({
-                        message: 'Tenant and Admin User registered successfully!',
-                        tenant: { tenant_id, ...newTenant },
-                        user: { user_id: userResult.insertId, ...newUser }
-                      });
+                    connection.query('INSERT INTO user_access (tenant_id, user_id, icon_label, role) VALUES ?', [userAccessValues], (err) => {
+                        if (err) {
+                            return connection.rollback(() => {
+                                connection.release();
+                                res.status(500).json({ error: 'An error occurred while saving admin permissions.', details: err.message });
+                            });
+                        }
+
+                        connection.commit((err) => {
+                          if (err) {
+                            return connection.rollback(() => {
+                              connection.release();
+                              res.status(500).json({ error: 'An error occurred during registration.', details: err.message });
+                            });
+                          }
+    
+                          connection.release();
+                          res.status(201).json({
+                            message: 'Tenant and Admin User registered successfully with full permissions!',
+                            tenant: { tenant_id, ...newTenant },
+                            user: { user_id: user_id, ...newUser }
+                          });
+                        });
                     });
                   });
                 });

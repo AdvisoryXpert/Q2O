@@ -20,7 +20,8 @@ const isAdmin = (req, res, next) => {
 // POST /api/invitations/
 router.post('/', isAdmin, (req, res) => {
   const { email, role } = req.body;
-  const { tenant_id, id: invited_by } = req.user;
+  const { id: invited_by } = req.user;
+  const tenant_id = req.tenant_id;
 
   if (!email || !role) {
     return res.status(400).json({ error: 'Email and role are required.' });

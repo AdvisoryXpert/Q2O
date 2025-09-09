@@ -27,19 +27,6 @@ app.use(cookieParser());
 
 app.set('trust proxy', 1);
 
-// NOTE: You don’t need sessions for JWT tokens; keep only if other features rely on it.
-/*app.use(session({
-  secret: process.env.SESSION_SECRET || 'your_secret_key',
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    secure: true,
-    httpOnly: true,
-    sameSite: 'none',
-    domain: process.env.COOKIE_DOMAIN
-  }
-}));*/
-
 // Static
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/uploads/lr-receipts', express.static(path.join(__dirname, 'uploads/lr-receipts')));
@@ -63,9 +50,8 @@ app.use('/api/login', loginRouter);
 const logoutRouter = require('./routes/logout')();
 app.use('/api/logout', logoutRouter);
 
-// (If you have a public session-status route, mount it here before auth)
 const sessionRouter = require('./routes/session');
-app.use('/api/session', sessionRouter); // ← was `app.use('/api', sessionRouter)`; narrow to /api/session
+app.use('/api/session', sessionRouter);
 
 const tenantRegistrationRouter = require('./routes/tenantRegistration');
 app.use('/api/tenants', tenantRegistrationRouter);
@@ -85,7 +71,7 @@ app.use(activityLogger);
 
 // Invitations (Protected)
 const invitationsRouter = require('./routes/invitations');
-app.use('/api/invitations', invitationsRouter);
+app.use('/api/admin/invitations', invitationsRouter);
 
 // Account Types
 const accountTypesRouter = require('./routes/accountTypes')(db);
@@ -109,7 +95,6 @@ app.use('/api/dealers', dealerRouter);
 
 // Dealer Quotation From POS Cart
 const dealerQuotationFromCart = require('./routes/dealerQuotationFromCart')(db);
-// was '/dealer-quotation-from-cart' (unprotected). Move under /api:
 app.use('/api/dealer-quotation-from-cart', dealerQuotationFromCart);
 
 // Dispatch (mobile)
@@ -126,11 +111,11 @@ app.use('/api/dispatchOrders', getDispatchInfoRoutes);
 const posDispatchRouter = require('./routes/pos_dispatch');
 app.use('/api/orders_pos', posDispatchRouter);
 
-// Notes  (was '/notes' → move under /api)
+// Notes
 const notesRoutes = require('./routes/notes');
 app.use('/api/notes', notesRoutes);
 
-// Attributes (was '/attributes' → move under /api)
+// Attributes
 const attributeRoutes = require('./routes/attributes');
 app.use('/api/attributes', attributeRoutes);
 
@@ -182,7 +167,7 @@ app.use("/api", updateInvoiceRoute);
 const invoiceRoute = require("./routes/invoice");
 app.use("/api", invoiceRoute);
 
-// Pricing (was '/pricing' → move under /api)
+// Pricing
 const pricingRoute = require("./routes/pricingRoute")(db);
 app.use("/api/pricing", pricingRoute);
 
@@ -196,7 +181,7 @@ app.use('/api', chatbotAnalytics);
 const analyticsRoutes = require('./routes/analyticsRoutes')(db);
 app.use('/api/analytics', analyticsRoutes);
 
-// Quotation Items (was GET /quotation-items/:quote_id → move under /api)
+// Quotation Items
 app.get('/api/quotation-items/:quote_id', (req, res) => {
   const { quote_id } = req.params;
   const fetchItemsSQL = `
@@ -205,12 +190,12 @@ app.get('/api/quotation-items/:quote_id', (req, res) => {
            qi.unit_price, qi.quantity*qi.unit_price AS total_price, qi.is_selected, q.dealer_id
     FROM ro_cpq.quotationitems qi
     JOIN ro_cpq.product p 
-      ON qi.product_id = p.product_id AND p.tenant_id = qi.tenant_id   -- tenant-safe join
+      ON qi.product_id = p.product_id AND p.tenant_id = qi.tenant_id
     JOIN ro_cpq.product_attribute pa 
       ON qi.product_attribute_id = pa.attribute_id AND pa.tenant_id = qi.tenant_id
     JOIN ro_cpq.quotation q 
       ON q.quote_id = qi.quote_id AND q.tenant_id = qi.tenant_id
-    WHERE qi.tenant_id = ? AND qi.quote_id = ?;                         -- tenant scope
+    WHERE qi.tenant_id = ? AND qi.quote_id = ?;
   `;
   db.query(fetchItemsSQL, [req.tenant_id, quote_id], (err, results) => {
     if (err) {
@@ -221,23 +206,20 @@ app.get('/api/quotation-items/:quote_id', (req, res) => {
   });
 });
 
-// Quotes by Phone (already under /api)
+// Quotes by Phone
 const quotesByPhoneRouter = require('./routes/quotesByPhone')(db);
 app.use('/api/quotes', quotesByPhoneRouter);
 
-// Change Password (already under /api)
+// Change Password
 const changePasswordRouter = require('./routes/changePassword');
 app.use('/api', changePasswordRouter);
 
-// Simple /api/me probe (optional) — helps test token/tenant_id quickly
+// Simple /api/me probe
 app.get('/api/me', (req, res) => {
   res.json({ ok: true, user: req.user, tenant_id: req.tenant_id });
 });
 
 // ----- OLD UNPROTECTED ROUTES (MOVED) -----
-// app.get('/quotes'...) and app.post('/dealer-quotation'...) were outside /api.
-// Re-expose them under /api so they’re protected:
-
 app.get('/api/quotes-raw', (req, res) => {
   const sql = 'SELECT * FROM ro_cpq.quotation WHERE tenant_id = ? ORDER BY date_created DESC';
   db.query(sql, [req.tenant_id], (err, results) => {
@@ -247,9 +229,6 @@ app.get('/api/quotes-raw', (req, res) => {
 });
 
 app.post('/api/dealer-quotation', (req, res) => {
-  // NOTE: You must add tenant filters/inserts in every query here.
-  // Example updates below:
-
   const { full_name, phone, location, total_price, user_id, dealer_type, 
           account_type, tds_level, hardness_level } = req.body;
 
