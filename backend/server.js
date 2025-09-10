@@ -16,7 +16,7 @@ const app = express();
 
 // ---- 2) CORS / parsers BEFORE auth ----
 const corsOptions = {
-  origin: ['http://127.0.0.1:3000', 'https://127.0.0.1:3000', 'http://192.168.1.73:3000'],
+  origin: ['http://127.0.0.1:5000', 'https://127.0.0.1:5000', 'http://192.168.1.3:3000'],
   credentials: true,
   allowedHeaders: ['Content-Type', 'Authorization', 'x-tenant-id'] // <— important for JWT header
 };
@@ -384,7 +384,7 @@ app.post('/api/dealer-quotation', (req, res) => {
             return res.status(500).json({ error: err.message, quote_id });
           }
           const createFollowup = require('./routes/CreateFollowup');
-          createFollowup('quote', quote_id, req.user.id, req.user.id);
+          createFollowup(req.tenant_id, 'quote', quote_id, req.user.id, req.user.id);
           return res.json({ message: "Dealer, Quotation, and All Quotation Items created", quote_id });
         });
       });
