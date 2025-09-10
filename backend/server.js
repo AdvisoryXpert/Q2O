@@ -1,30 +1,38 @@
 // node backend/server.js
-require('dotenv').config({ path: '../.env' }); // 1) load env ASAP
+require('dotenv').config({ path: '../.env' }); // load env ASAP
 
 const express = require('express');
 const cors = require('cors');
 const db = require('./db');
 const path = require('path');
-//const session = require('express-session');
 const cookieParser = require('cookie-parser');
-const verifyToken = require('./middleware/auth'); // JWT verify (sets req.user and req.tenant_id)
+const verifyToken = require('./middleware/auth');
 const fs = require('fs');
 const https = require('https');
 const http = require('http');
 
 const app = express();
 
-// ---- 2) CORS / parsers BEFORE auth ----
+// ---- CORS / parsers BEFORE auth ----
+const allowedOrigins = [
+  // old dev ports you used
+  'http://127.0.0.1:3000',
+  'https://127.0.0.1:3000',
+  'http://192.168.1.73:3000',
+  // add Vite defaults
+  'http://127.0.0.1:5173',
+  'https://127.0.0.1:5173',
+  'https://q2o.local:5173'
+];
 const corsOptions = {
   origin: ['http://127.0.0.1:5000', 'https://127.0.0.1:5000', 'http://192.168.1.3:3000'],
   credentials: true,
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-tenant-id'] // <— important for JWT header
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-tenant-id']
 };
 app.use(cors(corsOptions));
 
 app.use(express.json());
 app.use(cookieParser());
-
 app.set('trust proxy', 1);
 
 // Static
@@ -41,9 +49,8 @@ db.getConnection((err, connection) => {
   connection.release();
 });
 
+// ------------ PUBLIC ROUTES ------------
 const expressFileUpload = require('express-fileupload');
-
-// ------------- 3) PUBLIC ROUTES (NO AUTH) -------------
 const loginRouter = require('./routes/login')(db);
 app.use('/api/login', loginRouter);
 
@@ -59,129 +66,101 @@ app.use('/api/tenants', tenantRegistrationRouter);
 const invitationsPublicRouter = require('./routes/invitationsPublic');
 app.use('/api/invitations', invitationsPublicRouter);
 
-// ------------- 4) PROTECT EVERYTHING ELSE UNDER /api -------------
+// ------------ AUTH GUARD ------------
 app.use('/api', verifyToken);
 
 // Activity logger AFTER auth so it can log req.user/req.tenant_id
 const activityLogger = require('./middleware/activityLogger')(db);
 app.use(activityLogger);
 
-// ------------- 5) PROTECTED ROUTES -------------
-// Keep everything under /api/* so verifyToken runs
-
-// Invitations (Protected)
+// ------------ PROTECTED ROUTES ------------
 const invitationsRouter = require('./routes/invitations');
 app.use('/api/admin/invitations', invitationsRouter);
 
-// Account Types
 const accountTypesRouter = require('./routes/accountTypes')(db);
 app.use('/api/account-types', accountTypesRouter);
 
-// LR Receipts
 const lrReceiptsRouter = require('./routes/lrReceipts')(db);
 app.use('/api/lr-receipts', expressFileUpload(), lrReceiptsRouter);
 const updateAttachmentRouter = require('./routes/updateAttachment');
 app.use('/api/lr-receipts', updateAttachmentRouter);
 
-// Service Requests
 const serviceUpload = require('./routes/updateServiceAttachment');
 app.use('/api/service-requests', expressFileUpload(), serviceUpload);
 const serviceRequestAPI = require('./routes/serviceRequestAPI');
 app.use('/api/service-requests', serviceRequestAPI);
 
-// Dealer
 const dealerRouter = require('./routes/dealer')(db);
 app.use('/api/dealers', dealerRouter);
 
-// Dealer Quotation From POS Cart
 const dealerQuotationFromCart = require('./routes/dealerQuotationFromCart')(db);
 app.use('/api/dealer-quotation-from-cart', dealerQuotationFromCart);
 
-// Dispatch (mobile)
 const disptch_mob = require('./routes/getOrderDispatchdtls')(db);
 app.use('/api/dipatch_mob', disptch_mob);
 
-// Warranty & Dispatch Info
 const warrantyRoutes = require('./routes/warrantyRoutes');
 app.use('/api/warranty', warrantyRoutes);
 const getDispatchInfoRoutes = require('./routes/getOrderDispatchInfo');
 app.use('/api/dispatchOrders', getDispatchInfoRoutes);
 
-// POS dispatch
 const posDispatchRouter = require('./routes/pos_dispatch');
 app.use('/api/orders_pos', posDispatchRouter);
 
-// Notes
 const notesRoutes = require('./routes/notes');
 app.use('/api/notes', notesRoutes);
 
-// Attributes
 const attributeRoutes = require('./routes/attributes');
 app.use('/api/attributes', attributeRoutes);
 
-// Product Pricing
 const productPricingRoutes = require('./routes/productPricingRoutes');
 app.use('/api/product-pricing', productPricingRoutes);
 
-// Product Admin
 const productAdminRoutes = require('./routes/productAdminRoutes');
 app.use('/api', productAdminRoutes);
 
-// User / Role Mgmt
 const userAccessRoutes = require('./routes/user_role_Access');
 app.use('/api/userMgmt', userAccessRoutes(db));
 
-// Quote→Order
 const quotestoorderRoutes = require('./routes/quotestoorder');
 app.use('/api/quotestoorder', quotestoorderRoutes);
 
-// Followups
 const followupsRouter = require('./routes/followups');
 app.use('/api/followups', followupsRouter);
 
-// Orders
 const postoorderRoutes = require('./routes/orders');
 app.use('/api/orders', postoorderRoutes);
 
-// Product Attributes / Variants
 const productAttributesRouter = require('./routes/Product_attributes')(db);
 app.use('/api/product_attributes', productAttributesRouter);
 const productvariantRouter = require('./routes/product_variants')(db);
 app.use('/api/product_variants', productvariantRouter);
 
-// Recent Orders
 const recentOrders = require('./routes/recentorders');
 app.use('/api/recentorders', recentOrders);
 
-// Dispatch Orders
 const dispatchOrders = require('./routes/dispatchOrders');
 app.use('/api/dispatchorders', dispatchOrders(db));
 
-// Reminders
 const reminder = require('./routes/reminders')(db);
 app.use('/api/reminders', reminder);
 
-// Invoice
 const updateInvoiceRoute = require("./routes/updateInvoice");
 app.use("/api", updateInvoiceRoute);
 const invoiceRoute = require("./routes/invoice");
 app.use("/api", invoiceRoute);
 
-// Pricing
 const pricingRoute = require("./routes/pricingRoute")(db);
 app.use("/api/pricing", pricingRoute);
 
-// Save quotation items
 const saveQuotationRoute = require('./routes/saveQuotation')(db);
 app.use('/api/save-quotation-items', saveQuotationRoute);
 
-// Analytics
 const chatbotAnalytics = require('./routes/chatHomeAnalytics');
 app.use('/api', chatbotAnalytics);
 const analyticsRoutes = require('./routes/analyticsRoutes')(db);
 app.use('/api/analytics', analyticsRoutes);
 
-// Quotation Items
 app.get('/api/quotation-items/:quote_id', (req, res) => {
   const { quote_id } = req.params;
   const fetchItemsSQL = `
@@ -206,15 +185,12 @@ app.get('/api/quotation-items/:quote_id', (req, res) => {
   });
 });
 
-// Quotes by Phone
 const quotesByPhoneRouter = require('./routes/quotesByPhone')(db);
 app.use('/api/quotes', quotesByPhoneRouter);
 
-// Change Password
 const changePasswordRouter = require('./routes/changePassword');
 app.use('/api', changePasswordRouter);
 
-// Simple /api/me probe
 app.get('/api/me', (req, res) => {
   res.json({ ok: true, user: req.user, tenant_id: req.tenant_id });
 });
@@ -377,15 +353,19 @@ const USE_HTTPS = process.env.USE_HTTPS === 'true';
 
 // ------------- 6) HTTPS server -------------
 if (USE_HTTPS) {
+  if (!fs.existsSync(KEY_PATH) || !fs.existsSync(CERT_PATH)) {
+    console.error('❌ TLS key/cert not found. Run scripts/gen-dev-cert.sh to generate dev certs.');
+    process.exit(1);
+  }
   const httpsOptions = {
-    key: fs.readFileSync(path.resolve(__dirname, '../key.pem')),
-    cert: fs.readFileSync(path.resolve(__dirname, '../cert.pem')),
+    key: fs.readFileSync(KEY_PATH),
+    cert: fs.readFileSync(CERT_PATH),
   };
   https.createServer(httpsOptions, app).listen(PORT, HOST, () => {
-    console.log(`🔒 HTTPS backend running at https://${HOST}:${PORT}`);
+    console.log(`🔒 HTTPS backend at https://127.0.0.1:${PORT}`);
   });
 } else {
   http.createServer(app).listen(PORT, HOST, () => {
-    console.log(`✅ HTTP backend running at http://${HOST}:${PORT}`);
+    console.log(`✅ HTTP backend at http://${HOST}:${PORT}`);
   });
 }
