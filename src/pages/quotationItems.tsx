@@ -12,12 +12,14 @@ import {
 	Tooltip,
 	Select,
 	MenuItem,
-	FormControl
+	FormControl,
+	useTheme,
+	useMediaQuery,
+	Paper
 } from "@mui/material";
 import ErrorIcon from '@mui/icons-material/Error';
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import App from "../App";
 import { http } from "../lib/http";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
@@ -63,6 +65,8 @@ const calculateMarginalPrice = (item: QuotationItem): number => {
 };
 
 const QuotationItems = () => {
+	const theme = useTheme();
+	const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 	const { id } = useParams();
 	const [quoteId, setQuoteId] = useState<number | null>(id ? Number(id) : null);
 	const [items, setItems] = useState<QuotationItem[]>([]);
@@ -675,258 +679,268 @@ const QuotationItems = () => {
 	);
 
 	return (
-		<Box sx={{ padding: 2 }}>
-			<Typography variant="h4" mb={2}>
-				Quotation Items
-			</Typography>
+		<Paper
+			sx={{
+				position: "fixed",
+				left: isMobile ? 0 : "var(--app-drawer-width, 240px)",
+				top: "var(--app-header-height, 56px)",
+				right: 0,
+				bottom: 0,
+				display: "flex",
+				flexDirection: "column",
+			}}
+		>
+			<Box sx={{ overflow: "auto", p: 2 }}>
+				<Typography variant="h4" mb={2}>
+					Quotation Items
+				</Typography>
 
-			{invalidItems.size > 0 && (
-				<Alert severity="error" sx={{ mb: 2 }}>
-					<Box display="flex" alignItems="center">
-						<ErrorIcon sx={{ mr: 1 }} />
-						{invalidItems.size} Some products have invalid prices. 
-						Please correct them before submitting.
-					</Box>
-				</Alert>
-			)}
+				{invalidItems.size > 0 && (
+					<Alert severity="error" sx={{ mb: 2 }}>
+						<Box display="flex" alignItems="center">
+							<ErrorIcon sx={{ mr: 1 }} />
+							{invalidItems.size} Some products have invalid prices. 
+							Please correct them before submitting.
+						</Box>
+					</Alert>
+				)}
 
-			<TextField
-				label="Enter Quotation ID"
-				type="number"
-				fullWidth
-				sx={{ mb: 2, maxWidth: 300 }}
-				value={quoteId ?? ""}
-				onChange={(e) => setQuoteId(Number(e.target.value))}
-			/>
-
-			<MaterialReactTable
-				columns={columns}
-				data={items}
-				enableRowSelection
-				state={{ rowSelection, pagination }}
-				onPaginationChange={setPagination}
-				getRowId={(row) => `${row.quote_item_id}`}
-				onRowSelectionChange={setRowSelection}
-			/>
-
-			<Typography variant="h6" align="right" sx={{ mt: 2 }}>
-				Total Sum: ₹
-				{items
-					.filter((item) => rowSelection[item.quote_item_id])
-					.reduce((sum, item) => sum + item.total_price, 0)
-					.toFixed(2)}
-			</Typography>
-
-			<Box sx={{ display: "flex", justifyContent: "center", gap: 3, mt: 3 }}>
-				<Button 
-					variant="contained" 
-					color="success" 
-					onClick={handleSubmit}
-					disabled={invalidItems.size > 0}
-				>
-					Save Quotation
-				</Button>
-				<Button
-					variant="contained"
-					color="secondary"
-					onClick={handleDispatchOrder}
-					disabled={invalidItems.size > 0}
-				>
-					Dispatch Order
-				</Button>
-				<Button
-					variant="contained"
-					color="primary"
-					disabled={invalidItems.size > 0}
-					onClick={() => setShowPDFOptions(true)}
-				>
-					Download PDF
-				</Button>
-				<Button
-					variant="contained"
-					color="success"
-					disabled={invalidItems.size > 0 || !dealerContact}
-					onClick={() => setShowWhatsAppOptions(true)}
-				>
-					Send to WhatsApp
-				</Button>
-			</Box>
-
-			<Box sx={{ mt: 5 }}>
-				<Typography variant="h6">Write Note for Quote #{quoteId}</Typography>
-				<ReactQuill
-					theme="snow"
-					value={noteContent}
-					onChange={setNoteContent}
-					style={{
-						height: "200px",
-						marginBottom: "20px",
-						backgroundColor: "#fff",
-					}}
+				<TextField
+					label="Enter Quotation ID"
+					type="number"
+					fullWidth
+					sx={{ mb: 2, maxWidth: 300 }}
+					value={quoteId ?? ""}
+					onChange={(e) => setQuoteId(Number(e.target.value))}
 				/>
-				<Box sx={{ display: "flex", justifyContent: "center", gap: 3, mt: 10 }}>          
-					<Button variant="contained" onClick={saveNote}>
-						Save Note
+
+				<MaterialReactTable
+					columns={columns}
+					data={items}
+					enableRowSelection
+					state={{ rowSelection, pagination }}
+					onPaginationChange={setPagination}
+					getRowId={(row) => `${row.quote_item_id}`}
+					onRowSelectionChange={setRowSelection}
+				/>
+
+				<Typography variant="h6" align="right" sx={{ mt: 2 }}>
+					Total Sum: ₹
+					{items
+						.filter((item) => rowSelection[item.quote_item_id])
+						.reduce((sum, item) => sum + item.total_price, 0)
+						.toFixed(2)}
+				</Typography>
+
+				<Box sx={{ display: "flex", justifyContent: "center", gap: 3, mt: 3 }}>
+					<Button 
+						variant="contained" 
+						color="success" 
+						onClick={handleSubmit}
+						disabled={invalidItems.size > 0}
+					>
+						Save Quotation
+					</Button>
+					<Button
+						variant="contained"
+						color="secondary"
+						onClick={handleDispatchOrder}
+						disabled={invalidItems.size > 0}
+					>
+						Dispatch Order
+					</Button>
+					<Button
+						variant="contained"
+						color="primary"
+						disabled={invalidItems.size > 0}
+						onClick={() => setShowPDFOptions(true)}
+					>
+						Download PDF
+					</Button>
+					<Button
+						variant="contained"
+						color="success"
+						disabled={invalidItems.size > 0 || !dealerContact}
+						onClick={() => setShowWhatsAppOptions(true)}
+					>
+						Send to WhatsApp
 					</Button>
 				</Box>
-			</Box>
 
-			{notes.length > 0 && (
-				<Box sx={{ mt: 4, p: 2, backgroundColor: "#fffde7", borderRadius: 2 }}>
-					<Typography variant="h6" gutterBottom>
-						Previous Notes
-					</Typography>
-					{notes.map((note) => (
-						<Box
-							key={note.note_id}
-							sx={{ mb: 3, p: 2, border: "1px solid #ddd", borderRadius: 2 }}
-						>
-							<Typography variant="caption" sx={{ color: "gray" }}>
-								{note.created_at
-									? new Date(note.created_at).toLocaleString()
-									: "No Date Available"}
-							</Typography>
-							<div
-								dangerouslySetInnerHTML={{
-									__html:
+				<Box sx={{ mt: 5 }}>
+					<Typography variant="h6">Write Note for Quote #{quoteId}</Typography>
+					<ReactQuill
+						theme="snow"
+						value={noteContent}
+						onChange={setNoteContent}
+						style={{
+							height: "200px",
+							marginBottom: "20px",
+							backgroundColor: "#fff",
+						}}
+					/>
+					<Box sx={{ display: "flex", justifyContent: "center", gap: 3, mt: 10 }}>          
+						<Button variant="contained" onClick={saveNote}>
+							Save Note
+						</Button>
+					</Box>
+				</Box>
+
+				{notes.length > 0 && (
+					<Box sx={{ mt: 4, p: 2, backgroundColor: "#fffde7", borderRadius: 2 }}>
+						<Typography variant="h6" gutterBottom>
+							Previous Notes
+						</Typography>
+						{notes.map((note) => (
+							<Box
+								key={note.note_id}
+								sx={{ mb: 3, p: 2, border: "1px solid #ddd", borderRadius: 2 }}
+							>
+								<Typography variant="caption" sx={{ color: "gray" }}>
+									{note.created_at
+										? new Date(note.created_at).toLocaleString()
+										: "No Date Available"}
+								</Typography>
+								<div
+									dangerouslySetInnerHTML={{
+										__html:
                     typeof note.note_text === "string"
                     	? note.note_text
                     	: JSON.stringify(note.note_text),
-								}}
-								style={{ marginTop: "8px", fontSize: "0.95rem" }}
-							/>
+									}}
+									style={{ marginTop: "8px", fontSize: "0.95rem" }}
+								/>
+							</Box>
+						))}
+					</Box>
+				)}
+
+				{showPDFOptions && (
+					<Box
+						sx={{
+							position: "fixed",
+							top: "50%",
+							left: "50%",
+							transform: "translate(-50%, -50%)",
+							backgroundColor: "white",
+							border: "1px solid #ccc",
+							borderRadius: 2,
+							boxShadow: 5,
+							padding: 4,
+							zIndex: 1000,
+							minWidth: 300,
+						}}
+					>
+						<Typography variant="h6" gutterBottom>
+							Select PDF Options
+						</Typography>
+
+						<Box>
+							<label>
+								<input
+									type="checkbox"
+									checked={includeBreakup}
+									onChange={(e) => setIncludeBreakup(e.target.checked)}
+								/>{" "}
+								Include Break-up (Quantity, Unit Price)
+							</label>
 						</Box>
-					))}
-				</Box>
-			)}
+						<Box mt={1}>
+							<label>
+								<input
+									type="checkbox"
+									checked={includeNotes}
+									onChange={(e) => setIncludeNotes(e.target.checked)}
+								/>{" "}
+								Include Notes
+							</label>
+						</Box>
 
-			{showPDFOptions && (
-				<Box
-					sx={{
-						position: "fixed",
-						top: "50%",
-						left: "50%",
-						transform: "translate(-50%, -50%)",
-						backgroundColor: "white",
-						border: "1px solid #ccc",
-						borderRadius: 2,
-						boxShadow: 5,
-						padding: 4,
-						zIndex: 1000,
-						minWidth: 300,
-					}}
+						<Box mt={3} display="flex" justifyContent="space-between">
+							<Button variant="outlined" onClick={() => setShowPDFOptions(false)}>
+								Cancel
+							</Button>
+							<Button
+								variant="contained"
+								onClick={() => {
+									handleGeneratePDF(includeBreakup, includeNotes);
+									setShowPDFOptions(false);
+								}}
+							>
+								Generate PDF
+							</Button>
+						</Box>
+					</Box>
+				)}
+
+				{showWhatsAppOptions && (
+					<Box
+						sx={{
+							position: "fixed",
+							top: "50%",
+							left: "50%",
+							transform: "translate(-50%, -50%)",
+							backgroundColor: "white",
+							border: "1px solid #ccc",
+							borderRadius: 2,
+							boxShadow: 5,
+							padding: 4,
+							zIndex: 1000,
+							minWidth: 300,
+						}}
+					>
+						<Typography variant="h6" gutterBottom>
+							Select PDF Options for WhatsApp
+						</Typography>
+
+						<Box>
+							<label>
+								<input
+									type="checkbox"
+									checked={includeBreakup}
+									onChange={(e) => setIncludeBreakup(e.target.checked)}
+								/>{" "}
+								Include Break-up (Quantity, Unit Price)
+							</label>
+						</Box>
+						<Box mt={1}>
+							<label>
+								<input
+									type="checkbox"
+									checked={includeNotes}
+									onChange={(e) => setIncludeNotes(e.target.checked)}
+								/>{" "}
+								Include Notes
+							</label>
+						</Box>
+
+						<Box mt={3} display="flex" justifyContent="space-between">
+							<Button variant="outlined" onClick={() => setShowWhatsAppOptions(false)}>
+								Cancel
+							</Button>
+							<Button
+								variant="contained"
+								onClick={() => {
+									handleSendWhatsAppConfirm(includeBreakup, includeNotes);
+									setShowWhatsAppOptions(false);
+								}}
+							>
+								Send
+							</Button>
+						</Box>
+					</Box>
+				)}
+
+				<Snackbar
+					open={snackbar.open}
+					autoHideDuration={6000}
+					onClose={() => setSnackbar({...snackbar, open: false})}
+					anchorOrigin={{ vertical: "top", horizontal: "center" }}
 				>
-					<Typography variant="h6" gutterBottom>
-						Select PDF Options
-					</Typography>
-
-					<Box>
-						<label>
-							<input
-								type="checkbox"
-								checked={includeBreakup}
-								onChange={(e) => setIncludeBreakup(e.target.checked)}
-							/>{" "}
-							Include Break-up (Quantity, Unit Price)
-						</label>
-					</Box>
-					<Box mt={1}>
-						<label>
-							<input
-								type="checkbox"
-								checked={includeNotes}
-								onChange={(e) => setIncludeNotes(e.target.checked)}
-							/>{" "}
-							Include Notes
-						</label>
-					</Box>
-
-					<Box mt={3} display="flex" justifyContent="space-between">
-						<Button variant="outlined" onClick={() => setShowPDFOptions(false)}>
-							Cancel
-						</Button>
-						<Button
-							variant="contained"
-							onClick={() => {
-								handleGeneratePDF(includeBreakup, includeNotes);
-								setShowPDFOptions(false);
-							}}
-						>
-							Generate PDF
-						</Button>
-					</Box>
-				</Box>
-			)}
-
-			{showWhatsAppOptions && (
-				<Box
-					sx={{
-						position: "fixed",
-						top: "50%",
-						left: "50%",
-						transform: "translate(-50%, -50%)",
-						backgroundColor: "white",
-						border: "1px solid #ccc",
-						borderRadius: 2,
-						boxShadow: 5,
-						padding: 4,
-						zIndex: 1000,
-						minWidth: 300,
-					}}
-				>
-					<Typography variant="h6" gutterBottom>
-						Select PDF Options for WhatsApp
-					</Typography>
-
-					<Box>
-						<label>
-							<input
-								type="checkbox"
-								checked={includeBreakup}
-								onChange={(e) => setIncludeBreakup(e.target.checked)}
-							/>{" "}
-							Include Break-up (Quantity, Unit Price)
-						</label>
-					</Box>
-					<Box mt={1}>
-						<label>
-							<input
-								type="checkbox"
-								checked={includeNotes}
-								onChange={(e) => setIncludeNotes(e.target.checked)}
-							/>{" "}
-							Include Notes
-						</label>
-					</Box>
-
-					<Box mt={3} display="flex" justifyContent="space-between">
-						<Button variant="outlined" onClick={() => setShowWhatsAppOptions(false)}>
-							Cancel
-						</Button>
-						<Button
-							variant="contained"
-							onClick={() => {
-								handleSendWhatsAppConfirm(includeBreakup, includeNotes);
-								setShowWhatsAppOptions(false);
-							}}
-						>
-							Send
-						</Button>
-					</Box>
-				</Box>
-			)}
-
-			<Snackbar
-				open={snackbar.open}
-				autoHideDuration={6000}
-				onClose={() => setSnackbar({...snackbar, open: false})}
-				anchorOrigin={{ vertical: "top", horizontal: "center" }}
-			>
-				<Alert severity="error">{snackbar.message}</Alert>
-			</Snackbar>
-
-			<App />
-		</Box>
+					<Alert severity="error">{snackbar.message}</Alert>
+				</Snackbar>
+			</Box>
+		</Paper>
 	);
 };
 
