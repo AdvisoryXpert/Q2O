@@ -15,14 +15,17 @@ import {
 	IconButton,
 	InputAdornment,
 	Paper,
-	Tab,
-	Tabs,
 	TextField,
 	Toolbar,
 	Tooltip,
 	Typography,
 	useMediaQuery,
 	useTheme,
+	Snackbar,
+	Alert,
+	FormControlLabel,
+	Switch,
+	Divider,
 } from "@mui/material";
 import {
 	DataGrid,
@@ -39,8 +42,6 @@ import PhoneIcon from "@mui/icons-material/Phone";
 import PlaceIcon from "@mui/icons-material/Place";
 import StarIcon from "@mui/icons-material/Star";
 import StarBorderIcon from "@mui/icons-material/StarBorder";
-import PersonIcon from "@mui/icons-material/Person";
-import BusinessIcon from "@mui/icons-material/Business";
 import CloseIcon from "@mui/icons-material/Close";
 import AddIcon from "@mui/icons-material/Add";
 import FilterListIcon from "@mui/icons-material/FilterList";
@@ -61,13 +62,35 @@ type Dealer = {
   gst_number?: string;
 };
 
+type DealerForm = {
+  full_name: string;
+  email?: string;
+  phone?: string;
+  location?: string;
+  dealer_type?: string;
+  account_type?: string;
+  gst_number?: string;
+  is_important?: boolean;
+};
+
 /** API helpers */
 async function fetchDealers(): Promise<Dealer[]> {
 	const { data } = await http.get("/dealers");
 	return data ?? [];
 }
+async function createDealer(payload: DealerForm): Promise<Dealer> {
+	const { data } = await http.post("/dealers", payload);
+	return data;
+}
 async function updateDealer(id: string, patch: Partial<Dealer>) {
 	await http.put(`/dealers/${id}`, patch);
+}
+async function deleteDealer(id: string) {
+	await http.delete(`/dealers/${id}`);
+}
+async function countDealerQuotations(id: string): Promise<number> {
+	const { data } = await http.get(`/dealers/${id}/quotations/count`);
+	return data?.quotationCount ?? 0;
 }
 
 export default function Contact() {
@@ -81,9 +104,30 @@ export default function Contact() {
 
 	// dialogs
 	const [quoteOpen, setQuoteOpen] = useState(false);
-	const [detailOpen, setDetailOpen] = useState(false);
-	const [activeTab, setActiveTab] = useState(0);
+	const [formOpen, setFormOpen] = useState(false);
+	const [formMode, setFormMode] = useState<"create" | "edit">("create");
 	const [selected, setSelected] = useState<Dealer | null>(null);
+
+	// form state
+	const emptyForm: DealerForm = {
+		full_name: "",
+		email: "",
+		phone: "",
+		location: "",
+		dealer_type: "",
+		account_type: "",
+		gst_number: "",
+		is_important: false,
+	};
+	const [form, setForm] = useState<DealerForm>(emptyForm);
+	const [saving, setSaving] = useState(false);
+
+	// snack
+	const [snack, setSnack] = useState<{ open: boolean; msg: string; type: "success" | "error" }>({
+		open: false,
+		msg: "",
+		type: "success",
+	});
 
 	useEffect(() => {
 		(async () => {
@@ -99,37 +143,73 @@ export default function Contact() {
 		})();
 	}, []);
 
+	/** Search filter */
 	const filtered = useMemo(() => {
 		const q = search.trim().toLowerCase();
 		if (!q) return rows;
 		return rows.filter((d) =>
-			[d.full_name, d.email, d.phone, d.location, d.account_type, d.dealer_type]
+			[d.full_name, d.email, d.phone, d.location, d.account_type, d.dealer_type, d.gst_number]
 				.filter(Boolean)
 				.some((v) => String(v).toLowerCase().includes(q))
 		);
 	}, [rows, search]);
 
+	const gridRows = useMemo(() => filtered.map((d) => ({ id: d.dealer_id, ...d })), [filtered]);
+
+	/** Handlers */
+	const openCreate = () => {
+		setFormMode("create");
+		setSelected(null);
+		setForm(emptyForm);
+		setFormOpen(true);
+	};
+
+	const openEdit = (d: Dealer) => {
+		setFormMode("edit");
+		setSelected(d);
+		setForm({
+			full_name: d.full_name ?? "",
+			email: d.email ?? "",
+			phone: d.phone ?? "",
+			location: d.location ?? "",
+			dealer_type: d.dealer_type ?? "",
+			account_type: d.account_type ?? "",
+			gst_number: d.gst_number ?? "",
+			is_important: Number(d.is_important) === 1 || d.is_important === true,
+		});
+		setFormOpen(true);
+	};
+
 	const handleViewQuotes = (d: Dealer) => {
 		setSelected(d);
 		setQuoteOpen(true);
 	};
-	const handleViewDetails = (d: Dealer) => {
-		setSelected(d);
-		setDetailOpen(true);
+
+	const handleToggleImportant = async (d: Dealer) => {
+		const id = String(d.dealer_id);
+		const next = !(Number(d.is_important) === 1 || d.is_important === true);
+		try {
+			await updateDealer(id, { is_important: next ? 1 : 0 });
+			setRows((prev) => prev.map((r) => (r.dealer_id === id ? { ...r, is_important: next ? 1 : 0 } : r)));
+		} catch (e: any) {
+			setSnack({ open: true, msg: e?.response?.data?.message || "Failed to update", type: "error" });
+		}
 	};
+
 	const handleDelete = async (d: Dealer) => {
 		try {
-			const { data } = await http.get(`/dealers/${d.dealer_id}/quotations/count`);
-			if (data.quotationCount > 0) {
+			const count = await countDealerQuotations(d.dealer_id);
+			if (count > 0) {
 				window.alert("This dealer has existing quotations and cannot be deleted.");
 				return;
 			}
 			if (window.confirm(`Delete dealer "${d.full_name}"?`)) {
-				await http.delete(`/dealers/${d.dealer_id}`);
+				await deleteDealer(d.dealer_id);
 				setRows((prev) => prev.filter((r) => r.dealer_id !== d.dealer_id));
+				setSnack({ open: true, msg: "Deleted", type: "success" });
 			}
-		} catch {
-			window.alert("Failed to delete dealer. Please try again.");
+		} catch (e: any) {
+			setSnack({ open: true, msg: e?.response?.data?.message || "Failed to delete", type: "error" });
 		}
 	};
 
@@ -137,14 +217,73 @@ export default function Contact() {
 	const processRowUpdate = async (newRow: GridRowModel, oldRow: GridRowModel) => {
 		const id = String(newRow.dealer_id || newRow.id);
 		const patch: Partial<Dealer> = {};
-		(["full_name", "email", "phone", "location", "account_type"] as const).forEach((k) => {
+		([
+			"full_name",
+			"email",
+			"phone",
+			"location",
+			"account_type",
+			"dealer_type",
+			"gst_number",
+			"is_important",
+		] as const).forEach((k) => {
 			if (newRow[k] !== oldRow[k]) (patch as any)[k] = newRow[k];
 		});
 		if (Object.keys(patch).length) {
+			// normalize is_important to 0/1
+			if (typeof patch.is_important === "boolean") {
+				patch.is_important = patch.is_important ? 1 : 0;
+			}
 			await updateDealer(id, patch);
 			setRows((prev) => prev.map((r) => (r.dealer_id === id ? { ...r, ...patch } : r)));
 		}
 		return newRow;
+	};
+
+	/** Save form */
+	const saveForm = async () => {
+		// minimal validation
+		if (!form.full_name || !form.full_name.trim()) {
+			setSnack({ open: true, msg: "Full name is required", type: "error" });
+			return;
+		}
+		if (form.gst_number && form.gst_number.trim() && form.gst_number.trim().length !== 15) {
+			setSnack({ open: true, msg: "GST number must be 15 characters", type: "error" });
+			return;
+		}
+
+		setSaving(true);
+		try {
+			const payload: DealerForm = {
+				...form,
+				is_important: !!form.is_important,
+			};
+
+			if (formMode === "create") {
+				await createDealer(payload);
+				// safest: refetch to get server ids/defaults
+				setRows(await fetchDealers());
+				setSnack({ open: true, msg: "Dealer created", type: "success" });
+			} else if (formMode === "edit" && selected?.dealer_id) {
+				await updateDealer(String(selected.dealer_id), {
+					...payload,
+					is_important: payload.is_important ? 1 : 0,
+				});
+				setRows((prev) =>
+					prev.map((r) =>
+						r.dealer_id === selected.dealer_id
+							? { ...r, ...payload, is_important: payload.is_important ? 1 : 0 }
+							: r
+					)
+				);
+				setSnack({ open: true, msg: "Dealer updated", type: "success" });
+			}
+			setFormOpen(false);
+		} catch (e: any) {
+			setSnack({ open: true, msg: e?.response?.data?.message || "Save failed", type: "error" });
+		} finally {
+			setSaving(false);
+		}
 	};
 
 	/** DataGrid columns (desktop) */
@@ -156,14 +295,27 @@ export default function Contact() {
 			sortable: false,
 			filterable: false,
 			disableColumnMenu: true,
-			renderCell: (p) =>
-				Number(p.value) === 1 ? <StarIcon color="warning" fontSize="small" /> : <StarBorderIcon fontSize="small" />,
+			renderCell: (p) => {
+				const highlighted = Number(p.value) === 1 || p.value === true;
+				return (
+					<IconButton
+						size="small"
+						onClick={(e) => {
+							e.stopPropagation();
+							handleToggleImportant(p.row as Dealer);
+						}}
+						aria-label={highlighted ? "Unmark important" : "Mark important"}
+					>
+						{highlighted ? <StarIcon color="warning" fontSize="small" /> : <StarBorderIcon fontSize="small" />}
+					</IconButton>
+				);
+			},
 		},
 		{
 			field: "full_name",
 			headerName: "Dealer",
 			flex: 1.6,
-			minWidth: 280, // bigger so it doesn't wrap
+			minWidth: 280,
 			editable: true,
 			renderCell: (p) => {
 				const d = p.row as Dealer;
@@ -173,22 +325,11 @@ export default function Contact() {
 							{d.full_name?.[0] ?? "?"}
 						</Avatar>
 						<Box sx={{ minWidth: 0 }}>
-							<Typography
-								fontWeight={700}
-								noWrap
-								title={d.full_name}
-								sx={{ whiteSpace: "nowrap", lineHeight: 1.2 }}
-							>
+							<Typography fontWeight={700} noWrap title={d.full_name} sx={{ whiteSpace: "nowrap", lineHeight: 1.2 }}>
 								{d.full_name}
 							</Typography>
 							{d.dealer_type && (
-								<Typography
-									noWrap
-									variant="caption"
-									color="text.secondary"
-									title={d.dealer_type}
-									sx={{ whiteSpace: "nowrap" }}
-								>
+								<Typography noWrap variant="caption" color="text.secondary" title={d.dealer_type} sx={{ whiteSpace: "nowrap" }}>
 									{d.dealer_type}
 								</Typography>
 							)}
@@ -243,6 +384,22 @@ export default function Contact() {
 			),
 		},
 		{
+			field: "dealer_type",
+			headerName: "Dealer Type",
+			flex: 1,
+			minWidth: 140,
+			editable: true,
+			renderCell: (p) => (
+				<Chip
+					label={p.value || "-"}
+					size="small"
+					color="secondary"
+					variant="outlined"
+					sx={{ height: 24, "& .MuiChip-label": { px: 1, fontSize: 12, fontWeight: 600 } }}
+				/>
+			),
+		},
+		{
 			field: "account_type",
 			headerName: "Account",
 			flex: 1,
@@ -254,12 +411,16 @@ export default function Contact() {
 					size="small"
 					color="primary"
 					variant="filled"
-					sx={{
-						height: 24,
-						"& .MuiChip-label": { px: 1, fontSize: 12, fontWeight: 600 },
-					}}
+					sx={{ height: 24, "& .MuiChip-label": { px: 1, fontSize: 12, fontWeight: 600 } }}
 				/>
 			),
+		},
+		{
+			field: "gst_number",
+			headerName: "GST",
+			flex: 0.9,
+			minWidth: 130,
+			editable: true,
 		},
 		{
 			field: "actions",
@@ -267,19 +428,19 @@ export default function Contact() {
 			sortable: false,
 			filterable: false,
 			disableColumnMenu: true,
-			minWidth: 140,
+			minWidth: 160,
 			flex: 0.9,
 			renderCell: (p) => {
 				const d = p.row as Dealer;
 				return (
 					<Box sx={{ display: "flex", gap: 0.5 }}>
-						<Tooltip title="View Quotes">
+						<Tooltip title="Quotations">
 							<IconButton size="small" color="primary" onClick={() => handleViewQuotes(d)}>
 								<VisibilityIcon fontSize="small" />
 							</IconButton>
 						</Tooltip>
-						<Tooltip title="Details">
-							<IconButton size="small" onClick={() => handleViewDetails(d)}>
+						<Tooltip title="Edit">
+							<IconButton size="small" onClick={() => openEdit(d)}>
 								<EditIcon fontSize="small" />
 							</IconButton>
 						</Tooltip>
@@ -293,8 +454,6 @@ export default function Contact() {
 			},
 		},
 	];
-
-	const gridRows = useMemo(() => filtered.map((d) => ({ id: d.dealer_id, ...d })), [filtered]);
 
 	return (
 		<>
@@ -334,6 +493,7 @@ export default function Contact() {
 							<Button
 								startIcon={<AddIcon />}
 								variant="contained"
+								onClick={openCreate}
 								sx={{
 									textTransform: "none",
 									fontWeight: 700,
@@ -379,7 +539,6 @@ export default function Contact() {
 							hideFooter
 							slots={{ toolbar: GridToolbar }}
 							slotProps={{ toolbar: { showQuickFilter: false } }}
-							// Bigger + colourful styling
 							columnHeaderHeight={52}
 							rowHeight={56}
 							sx={{
@@ -388,8 +547,7 @@ export default function Contact() {
 								fontSize: ".95rem",
 								"& .MuiDataGrid-columnHeaders": {
 									fontWeight: 800,
-									background:
-                    "linear-gradient(90deg, rgba(7,71,166,0.07) 0%, rgba(7,71,166,0.03) 100%)",
+									background: "linear-gradient(90deg, rgba(7,71,166,0.07) 0%, rgba(7,71,166,0.03) 100%)",
 								},
 								"& .MuiDataGrid-columnHeaderTitle": { fontWeight: 800 },
 								"& .MuiDataGrid-cell": {
@@ -407,7 +565,7 @@ export default function Contact() {
 							autoHeight={gridRows.length <= 14}
 						/>
 					) : (
-					// mobile cards unchanged
+					// mobile cards
 						<Box
 							sx={{
 								overflowY: "auto",
@@ -418,201 +576,201 @@ export default function Contact() {
 							}}
 						>
 							<Grid container spacing={1}>
-								{filtered.map((d) => (
-									<Grid item xs={12} key={d.dealer_id}>
-										<Card variant="outlined" sx={{ borderRadius: 2 }}>
-											<CardContent sx={{ py: 1.25 }}>
-												<Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
-													<Avatar sx={{ width: 32, height: 32, mr: 1, bgcolor: "primary.main" }}>
-														{d.full_name?.[0] ?? "?"}
-													</Avatar>
-													<Box sx={{ minWidth: 0, flex: 1 }}>
-														<Typography fontWeight={700} noWrap title={d.full_name}>
-															{d.full_name}
-														</Typography>
-														<Typography variant="caption" color="text.secondary" noWrap>
-															{d.dealer_type}
+								{filtered.map((d) => {
+									const highlighted = Number(d.is_important) === 1 || d.is_important === true;
+									return (
+										<Grid item xs={12} key={d.dealer_id}>
+											<Card variant="outlined" sx={{ borderRadius: 2 }}>
+												<CardContent sx={{ py: 1.25 }}>
+													<Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+														<Avatar sx={{ width: 32, height: 32, mr: 1, bgcolor: "primary.main" }}>
+															{d.full_name?.[0] ?? "?"}
+														</Avatar>
+														<Box sx={{ minWidth: 0, flex: 1 }}>
+															<Typography fontWeight={700} noWrap title={d.full_name}>
+																{d.full_name}
+															</Typography>
+															<Typography variant="caption" color="text.secondary" noWrap>
+																{d.dealer_type}
+															</Typography>
+														</Box>
+														<IconButton size="small" onClick={() => handleToggleImportant(d)} aria-label="toggle important">
+															{highlighted ? <StarIcon color="warning" fontSize="small" /> : <StarBorderIcon fontSize="small" />}
+														</IconButton>
+													</Box>
+
+													<Box sx={{ display: "flex", alignItems: "center", mb: 0.5 }}>
+														<EmailIcon sx={{ fontSize: 14, mr: 0.5, color: "text.secondary" }} />
+														<Typography variant="body2" noWrap title={d.email}>
+															{d.email}
 														</Typography>
 													</Box>
-													{Number(d.is_important) === 1 ? (
-														<StarIcon color="warning" fontSize="small" />
-													) : (
-														<StarBorderIcon fontSize="small" />
-													)}
-												</Box>
+													<Box sx={{ display: "flex", alignItems: "center", mb: 0.5 }}>
+														<PhoneIcon sx={{ fontSize: 14, mr: 0.5, color: "text.secondary" }} />
+														<Typography variant="body2" noWrap title={d.phone}>
+															{d.phone}
+														</Typography>
+													</Box>
+													<Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+														<PlaceIcon sx={{ fontSize: 14, mr: 0.5, color: "text.secondary" }} />
+														<Typography variant="body2" noWrap title={d.location}>
+															{d.location}
+														</Typography>
+													</Box>
 
-												<Box sx={{ display: "flex", alignItems: "center", mb: 0.5 }}>
-													<EmailIcon sx={{ fontSize: 14, mr: 0.5, color: "text.secondary" }} />
-													<Typography variant="body2" noWrap title={d.email}>
-														{d.email}
-													</Typography>
-												</Box>
-												<Box sx={{ display: "flex", alignItems: "center", mb: 0.5 }}>
-													<PhoneIcon sx={{ fontSize: 14, mr: 0.5, color: "text.secondary" }} />
-													<Typography variant="body2" noWrap title={d.phone}>
-														{d.phone}
-													</Typography>
-												</Box>
-												<Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
-													<PlaceIcon sx={{ fontSize: 14, mr: 0.5, color: "text.secondary" }} />
-													<Typography variant="body2" noWrap title={d.location}>
-														{d.location}
-													</Typography>
-												</Box>
-
-												<Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-													<Chip
-														label={d.account_type || "-"}
-														size="small"
-														color="primary"
-														variant="filled"
-														sx={{ height: 22, "& .MuiChip-label": { px: 0.75, fontSize: 11 } }}
-													/>
-													<Box sx={{ flex: 1 }} />
-													<Tooltip title="Quotes">
-														<IconButton size="small" color="primary" onClick={() => handleViewQuotes(d)}>
-															<VisibilityIcon fontSize="small" />
-														</IconButton>
-													</Tooltip>
-													<Tooltip title="Details">
-														<IconButton size="small" onClick={() => handleViewDetails(d)}>
-															<EditIcon fontSize="small" />
-														</IconButton>
-													</Tooltip>
-													<Tooltip title="Delete">
-														<IconButton size="small" color="error" onClick={() => handleDelete(d)}>
-															<DeleteIcon fontSize="small" />
-														</IconButton>
-													</Tooltip>
-												</Box>
-											</CardContent>
-										</Card>
-									</Grid>
-								))}
+													<Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+														<Chip
+															label={d.account_type || "-"}
+															size="small"
+															color="primary"
+															variant="filled"
+															sx={{ height: 22, "& .MuiChip-label": { px: 0.75, fontSize: 11 } }}
+														/>
+														<Box sx={{ flex: 1 }} />
+														<Tooltip title="Quotes">
+															<IconButton size="small" color="primary" onClick={() => handleViewQuotes(d)}>
+																<VisibilityIcon fontSize="small" />
+															</IconButton>
+														</Tooltip>
+														<Tooltip title="Edit">
+															<IconButton size="small" onClick={() => openEdit(d)}>
+																<EditIcon fontSize="small" />
+															</IconButton>
+														</Tooltip>
+														<Tooltip title="Delete">
+															<IconButton size="small" color="error" onClick={() => handleDelete(d)}>
+																<DeleteIcon fontSize="small" />
+															</IconButton>
+														</Tooltip>
+													</Box>
+												</CardContent>
+											</Card>
+										</Grid>
+									);
+								})}
 							</Grid>
 						</Box>
 					)}
 				</Box>
 			</Paper>
 
-			{/* Details dialog */}
+			{/* Create / Edit dialog */}
 			<Dialog
-				open={detailOpen}
-				onClose={() => setDetailOpen(false)}
+				open={formOpen}
+				onClose={() => setFormOpen(false)}
 				fullWidth
+				fullScreen={isMobile}
 				maxWidth="md"
 				PaperProps={{ sx: { borderRadius: 2 } }}
 			>
 				<DialogTitle sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-					<Typography variant="h6">Dealer Details</Typography>
-					<IconButton onClick={() => setDetailOpen(false)} size="small">
+					<Typography variant="h6">{formMode === "create" ? "New Dealer" : "Edit Dealer"}</Typography>
+					<IconButton onClick={() => setFormOpen(false)} size="small">
 						<CloseIcon />
 					</IconButton>
 				</DialogTitle>
 				<DialogContent dividers>
-					{selected ? (
-						<Box>
-							<Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-								<Avatar sx={{ width: 56, height: 56, mr: 2, bgcolor: "primary.main" }}>
-									{selected.full_name?.[0] ?? "?"}
-								</Avatar>
-								<Box>
-									<Typography variant="h6">
-										{selected.full_name}
-										{Number(selected.is_important) === 1 && (
-											<StarIcon color="warning" sx={{ ml: 1, verticalAlign: "text-bottom" }} />
-										)}
-									</Typography>
-									<Chip label={selected.dealer_type || "-"} size="small" />
-								</Box>
-							</Box>
+					<Grid container spacing={2}>
+						<Grid item xs={12} sm={6}>
+							<TextField
+								required
+								fullWidth
+								label="Full Name"
+								value={form.full_name}
+								onChange={(e) => setForm((f) => ({ ...f, full_name: e.target.value }))}
+							/>
+						</Grid>
+						<Grid item xs={12} sm={6}>
+							<TextField
+								type="email"
+								fullWidth
+								label="Email"
+								value={form.email || ""}
+								onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+							/>
+						</Grid>
+						<Grid item xs={12} sm={6}>
+							<TextField
+								fullWidth
+								label="Phone"
+								value={form.phone || ""}
+								onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+							/>
+						</Grid>
+						<Grid item xs={12} sm={6}>
+							<TextField
+								fullWidth
+								label="Location"
+								value={form.location || ""}
+								onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
+							/>
+						</Grid>
+						<Grid item xs={12} sm={6}>
+							<TextField
+								fullWidth
+								label="Dealer Type"
+								placeholder="Dealer / Distributor / Technician / SME"
+								value={form.dealer_type || ""}
+								onChange={(e) => setForm((f) => ({ ...f, dealer_type: e.target.value }))}
+							/>
+						</Grid>
+						<Grid item xs={12} sm={6}>
+							<TextField
+								fullWidth
+								label="Account Type"
+								placeholder="Retail / B2B / OEM ..."
+								value={form.account_type || ""}
+								onChange={(e) => setForm((f) => ({ ...f, account_type: e.target.value }))}
+							/>
+						</Grid>
+						<Grid item xs={12} sm={6}>
+							<TextField
+								fullWidth
+								label="GST Number"
+								placeholder="15 characters"
+								value={form.gst_number || ""}
+								onChange={(e) => setForm((f) => ({ ...f, gst_number: e.target.value.toUpperCase() }))}
+								inputProps={{ maxLength: 15 }}
+							/>
+						</Grid>
+						<Grid item xs={12} sm={6} sx={{ display: "flex", alignItems: "center" }}>
+							<FormControlLabel
+								control={
+									<Switch
+										checked={!!form.is_important}
+										onChange={(e) => setForm((f) => ({ ...f, is_important: e.target.checked }))}
+									/>
+								}
+								label="Mark as Important"
+							/>
+						</Grid>
+					</Grid>
 
-							<Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} sx={{ mb: 1 }}>
-								<Tab label="Overview" />
-								<Tab label="Details" />
-							</Tabs>
-
-							{activeTab === 0 && (
-								<Grid container spacing={2}>
-									<Grid item xs={12} sm={6}>
-										<Card variant="outlined">
-											<CardContent>
-												<Typography variant="subtitle1" sx={{ display: "flex", alignItems: "center" }}>
-													<PersonIcon sx={{ mr: 1 }} /> Contact Information
-												</Typography>
-												<Box sx={{ mt: 1 }}>
-													<Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
-														<EmailIcon sx={{ mr: 1, color: "text.secondary" }} />
-														<Typography>{selected.email}</Typography>
-													</Box>
-													<Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
-														<PhoneIcon sx={{ mr: 1, color: "text.secondary" }} />
-														<Typography>{selected.phone}</Typography>
-													</Box>
-													<Box sx={{ display: "flex", alignItems: "center" }}>
-														<PlaceIcon sx={{ mr: 1, color: "text.secondary" }} />
-														<Typography>{selected.location}</Typography>
-													</Box>
-												</Box>
-											</CardContent>
-										</Card>
-									</Grid>
-									<Grid item xs={12} sm={6}>
-										<Card variant="outlined">
-											<CardContent>
-												<Typography variant="subtitle1" sx={{ display: "flex", alignItems: "center" }}>
-													<BusinessIcon sx={{ mr: 1 }} /> Account Information
-												</Typography>
-												<Box sx={{ mt: 1 }}>
-													<Chip label={selected.account_type || "-"} size="small" variant="outlined" />
-													{selected.gst_number && (
-														<Typography sx={{ mt: 1 }}>GST: {selected.gst_number}</Typography>
-													)}
-													<Typography sx={{ mt: 1 }}>
-														Since: {new Date(selected.date_created).toLocaleDateString()}
-													</Typography>
-												</Box>
-											</CardContent>
-										</Card>
-									</Grid>
+					{formMode === "edit" && selected && (
+						<>
+							<Divider sx={{ my: 2 }} />
+							<Grid container spacing={2}>
+								<Grid item xs={12} sm={6}>
+									<TextField fullWidth label="Created On" value={new Date(selected.date_created).toLocaleString()} InputProps={{ readOnly: true }} />
 								</Grid>
-							)}
-
-							{activeTab === 1 && (
-								<Grid container spacing={2}>
-									<Grid item xs={12} sm={6}>
-										<TextField fullWidth label="Full Name" value={selected.full_name} InputProps={{ readOnly: true }} />
-									</Grid>
-									<Grid item xs={12} sm={6}>
-										<TextField fullWidth label="Email" value={selected.email} InputProps={{ readOnly: true }} />
-									</Grid>
-									<Grid item xs={12} sm={6}>
-										<TextField fullWidth label="Phone" value={selected.phone} InputProps={{ readOnly: true }} />
-									</Grid>
-									<Grid item xs={12} sm={6}>
-										<TextField fullWidth label="Location" value={selected.location} InputProps={{ readOnly: true }} />
-									</Grid>
-									<Grid item xs={12} sm={6}>
-										<TextField fullWidth label="Dealer Type" value={selected.dealer_type || ""} InputProps={{ readOnly: true }} />
-									</Grid>
-									<Grid item xs={12} sm={6}>
-										<TextField fullWidth label="Account Type" value={selected.account_type || ""} InputProps={{ readOnly: true }} />
-									</Grid>
+								<Grid item xs={12} sm={6}>
+									<TextField fullWidth label="Dealer ID" value={selected.dealer_id} InputProps={{ readOnly: true }} />
 								</Grid>
-							)}
-						</Box>
-					) : (
-						<Typography>No dealer selected</Typography>
+							</Grid>
+						</>
 					)}
 				</DialogContent>
 				<DialogActions>
-					<Button onClick={() => setDetailOpen(false)} variant="outlined">
-						Close
+					<Button onClick={() => setFormOpen(false)} variant="outlined" disabled={saving}>
+						Cancel
+					</Button>
+					<Button onClick={saveForm} variant="contained" disabled={saving}>
+						{saving ? "Saving..." : "Save"}
 					</Button>
 				</DialogActions>
 			</Dialog>
 
-			{/* Quotes dialog */}
+			{/* Quotes dialog (unchanged, just styled header retained) */}
 			<Dialog
 				open={quoteOpen}
 				onClose={() => setQuoteOpen(false)}
@@ -646,6 +804,18 @@ export default function Contact() {
 					</Button>
 				</DialogActions>
 			</Dialog>
+
+			{/* Snackbar */}
+			<Snackbar
+				open={snack.open}
+				autoHideDuration={2200}
+				onClose={() => setSnack((s) => ({ ...s, open: false }))}
+				anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+			>
+				<Alert onClose={() => setSnack((s) => ({ ...s, open: false }))} severity={snack.type} sx={{ width: "100%" }}>
+					{snack.msg}
+				</Alert>
+			</Snackbar>
 		</>
 	);
 }
