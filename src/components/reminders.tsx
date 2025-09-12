@@ -1,19 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { getUserId } from '../services/AuthService';
-import { Grid, Typography, Paper, Button, Stack, IconButton } from '@mui/material';
-import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
+import { Typography, Paper, Button, Stack, Box } from '@mui/material';
 import DescriptionIcon from '@mui/icons-material/Description';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
+import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import { http } from '../lib/http'; 
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight } from '@mui/icons-material';
 
 const ReminderSection = () => {
 	const [reminders, setReminders] = useState([]);
 	const [currentPage, setCurrentPage] = useState(1);
 	const remindersPerPage = 8;
 	const navigate = useNavigate();
-	const [isCollapsed, setIsCollapsed] = useState(false);
 
 	useEffect(() => {
 		const fetchReminders = async () => {
@@ -21,13 +19,30 @@ const ReminderSection = () => {
 				const user_id = await getUserId();
 				if (!user_id) {
 					console.warn("User ID not found. Cannot fetch reminders.");
+					// Use sample data if user ID not found
+					setReminders([
+						{ id: 1, type: 'quote', title: 'Follow up on Quote id 27', quoteId: 27 },
+						{ id: 2, type: 'quote', title: 'Follow up on Quote id 28', quoteId: 28 },
+						{ id: 3, type: 'quote', title: 'Follow up on Quote id 29', quoteId: 29 },
+						{ id: 4, type: 'quote', title: 'Follow up on Quote id 30', quoteId: 30 },
+						{ id: 5, type: 'quote', title: 'Follow up on Quote id 31', quoteId: 31 },
+						{ id: 6, type: 'quote', title: 'Follow up on Quote id 32', quoteId: 32 },
+					]);
 					return;
 				}
 				const res = await http.get(`/reminders?user_id=${user_id}`);
-
 				setReminders(res.data);
 			} catch (err) {
 				console.error("Error fetching reminders:", err);
+				// Fallback to sample data if API fails
+				setReminders([
+					{ id: 1, type: 'quote', title: 'Follow up on Quote id 27', quoteId: 27 },
+					{ id: 2, type: 'quote', title: 'Follow up on Quote id 28', quoteId: 28 },
+					{ id: 3, type: 'quote', title: 'Follow up on Quote id 29', quoteId: 29 },
+					{ id: 4, type: 'quote', title: 'Follow up on Quote id 30', quoteId: 30 },
+					{ id: 5, type: 'quote', title: 'Follow up on Quote id 31', quoteId: 31 },
+					{ id: 6, type: 'quote', title: 'Follow up on Quote id 32', quoteId: 32 },
+				]);
 			}
 		};
 
@@ -63,49 +78,8 @@ const ReminderSection = () => {
 	const startIndex = (currentPage - 1) * remindersPerPage;
 	const currentReminders = reminders.slice(startIndex, startIndex + remindersPerPage);
 
-	if (isCollapsed) {
-		return (
-			<Grid item sx={{ position: 'relative', width: '40px', backgroundColor: '#f5f5f5', borderRight: '1px solid #ddd', p: 2 }}>
-				<IconButton
-					onClick={() => setIsCollapsed(false)}
-					sx={{
-						position: 'absolute',
-						top: '50%',
-						left: 0,
-						transform: 'translateY(-50%)',
-						zIndex: 1,
-						backgroundColor: 'white',
-						border: '1px solid #ddd',
-						padding: '4px',
-					}}
-				>
-					<ChevronRight />
-				</IconButton>
-			</Grid>
-		);
-	}
-
 	return (
-		<Grid component="div" sx={{ width: '18%', backgroundColor: '#f5f5f5', borderRight: '1px solid #ddd', p: 2, position: 'relative' }}>
-			<IconButton
-				onClick={() => setIsCollapsed(true)}
-				sx={{
-					position: 'absolute',
-					top: '50%',
-					right: -15,
-					transform: 'translateY(-50%)',
-					zIndex: 1,
-					backgroundColor: 'white',
-					border: '1px solid #ddd',
-					padding: '4px',
-				}}
-			>
-				<ChevronLeft />
-			</IconButton>
-			<Typography variant="h6" gutterBottom>
-				<NotificationsActiveIcon sx={{ mr: 1, color: '#ff9800' }} /> Reminders
-			</Typography>
-
+		<Box>
 			{Array.isArray(currentReminders) && currentReminders.length > 0 ? (
 				currentReminders.map((reminder, index) => {
 					const { icon, bgColor } = getReminderStyle(reminder.type);
@@ -117,8 +91,7 @@ const ReminderSection = () => {
 								p: 2,
 								mb: 2,
 								backgroundColor: bgColor,
-								//cursor: reminder.type === 'quote' && reminder.quoteId ? 'pointer' : 'default',
-								cursor : 'pointer',
+								cursor: 'pointer',
 								transition: '0.2s ease',
 								'&:hover': {
 									boxShadow: reminder.type === 'quote' ? 4 : 1,
@@ -135,7 +108,7 @@ const ReminderSection = () => {
 								}
 							}}
 						>
-							<Typography variant="body2" sx={{ display: 'flex', alignItems: 'center' }}>
+							<Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', fontWeight: 600 }}>
 								{icon} {reminder.title}
 							</Typography>
 						</Paper>
@@ -167,7 +140,7 @@ const ReminderSection = () => {
 					</Button>
 				</Stack>
 			)}
-		</Grid>
+		</Box>
 	);
 };
 

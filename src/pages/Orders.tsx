@@ -64,11 +64,12 @@ type Dealer = { dealer_id: number; full_name: string };
 /* -------------------- API helpers -------------------- */
 async function fetchOrders(): Promise<Order[]> {
 	try {
-		const { data } = await http.get("/orders");
-		return data ?? [];
-	} catch {
+		//const { data } = await http.get("/orders");
+		//return data ?? [];
 		const { data } = await http.get("/recentorders");
 		return data ?? [];
+	} catch {
+		
 	}
 }
 async function fetchDealers(): Promise<Dealer[]> {

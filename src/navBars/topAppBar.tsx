@@ -82,7 +82,7 @@ const TopAppBar: React.FC = () => {
 			>
 				<Toolbar sx={{ minHeight: 64, px: 1.5, gap: 1 }}>
 					<IconButton onClick={toggle} aria-label="Toggle navigation">
-						{open ? <MenuOpenIcon /> : <MenuIcon />}
+						{open ? <MenuOpenIcon sx={{ color: 'white' }} /> : <MenuIcon sx={{ color: 'white' }} />}
 					</IconButton>
 					{(!mdDown && open) || mdDown ? (
 						<Box sx={{ display: "flex", alignItems: "center", gap: 1, fontWeight: 600 }}>
@@ -107,14 +107,20 @@ const TopAppBar: React.FC = () => {
 									}}
 									sx={{
 										px: 1.5,
-										"&.Mui-selected": { bgcolor: "action.selected" },
+										color: "white",
+										"&.Mui-selected": {
+											bgcolor: "rgba(255, 255, 255, 0.2)",
+										},
+										"&:hover": {
+											bgcolor: "rgba(0, 0, 0, 0.1)",
+										},
 										"& .MuiListItemIcon-root": {
 											minWidth: 0,
 											mr: !mdDown && open ? 1.5 : 0,
 											justifyContent: "center",
+											color: "white",
 										},
-									}}
-								>
+									}}								>
 									<ListItemIcon>{React.cloneElement(item.icon, { fontSize: "medium" })}</ListItemIcon>
 									{(!mdDown && open) || mdDown ? <ListItemText primary={item.label} /> : null}
 								</ListItemButton>
@@ -140,14 +146,14 @@ const TopAppBar: React.FC = () => {
 							<Typography noWrap variant="body2" sx={{ fontWeight: 600 }}>
 								{userName ? `Welcome, ${userName}` : "Welcome"}
 							</Typography>
-							<Button onClick={handleLogout} startIcon={<LogoutIcon />} size="small" sx={{ mt: 0.5, textTransform: "none" }}>
+							<Button onClick={handleLogout} startIcon={<LogoutIcon sx={{ color: 'white' }} />} size="small" sx={{ mt: 0.5, textTransform: "none", color: "white" }}>
 								Logout
 							</Button>
 						</Box>
 					) : (
 						<Tooltip title="Logout">
 							<IconButton onClick={handleLogout} size="small">
-								<LogoutIcon fontSize="small" />
+								<LogoutIcon fontSize="small" sx={{ color: 'white' }} />
 							</IconButton>
 						</Tooltip>
 					)}
@@ -221,6 +227,7 @@ const TopAppBar: React.FC = () => {
 									duration: t.transitions.duration.shortest,
 								}),
 							zIndex: theme.zIndex.drawer,
+							background: "linear-gradient(45deg, #2196F3 30%, #64B5F6 90%)",
 						},
 					}}
 				>

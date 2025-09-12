@@ -1,155 +1,222 @@
-// Updated POSSales.tsx to use dealer-quotation-from-cart API for quote submission
-import React, { useEffect, useState } from 'react';
-import { getUserId } from '../services/AuthService';
+import React, { useEffect, useMemo, useState } from "react";
+import { getUserId } from "../services/AuthService";
 import {
-	Box, Typography, Grid, Button, TextField,
-	Divider, Paper, MenuItem, Select, InputLabel, FormControl, IconButton, Stack, Autocomplete
-} from '@mui/material';
-import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
-import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
-import DeleteIcon from '@mui/icons-material/Delete';
-import RemoveIcon from '@mui/icons-material/Remove';
-import AddIcon from '@mui/icons-material/Add';
-import { http } from '../lib/http';
-import { useNavigate } from 'react-router-dom';
+	AppBar,
+	Box,
+	Button,
+	Card,
+	IconButton,
+	Paper,
+	TextField,
+	Toolbar,
+	Typography,
+	useMediaQuery,
+	useTheme,
+	Stack,
+	Autocomplete,
+	Divider,
+	Chip,
+} from "@mui/material";
+import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
+import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
+import DeleteIcon from "@mui/icons-material/Delete";
+import RemoveIcon from "@mui/icons-material/Remove";
+import AddIcon from "@mui/icons-material/Add";
+import { http } from "../lib/http";
+import { useNavigate } from "react-router-dom";
 
-const POSPage = () => {
-	const [products, setProducts] = useState<any[]>([]);
-	const [dealers, setDealers] = useState<any[]>([]);
-	const [selectedDealer, setSelectedDealer] = useState('');
-	const [cart, setCart] = useState<any[]>([]);
-	const [rows, setRows] = useState([{ product_id: '', component_id: '', components: [], disabled: false }]);
-	const [cartNote, setCartNote] = useState('');
-	const [dropdownWidth, setDropdownWidth] = useState(0);
+/* -------------------------- Types -------------------------- */
+type Dealer = { dealer_id: number; full_name: string; [k: string]: any };
+type Variant = { attribute_id: number; attribute_name: string; price: number; [k: string]: any };
+type Product = { product_id: number; product_name: string; variants: Variant[]; [k: string]: any };
+
+type RowState = {
+  product_id: number | "";
+  component_id: number | "";
+  components: Variant[];
+  disabled: boolean;
+};
+
+type CartItem = {
+  id: number;
+  name: string;
+  price: number;
+  attribute_id: number;
+  quantity: number;
+};
+
+/* -------------------------- Utils -------------------------- */
+const toINR = (n: number) =>
+	n.toLocaleString("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 });
+
+/* XL input styling for TextField inside Autocomplete */
+const inputXL = {
+	"& .MuiInputBase-root": {
+		height: 64,
+		borderRadius: 12,
+		px: 1.5,
+		fontSize: 16,
+	},
+	"& .MuiInputBase-input": { py: 1.75 },
+	"& .MuiFormLabel-root": { fontSize: 14 },
+};
+
+export default function POSSalesPage() {
+	const theme = useTheme();
+	const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 	const navigate = useNavigate();
 
+	const [products, setProducts] = useState<Product[]>([]);
+	const [dealers, setDealers] = useState<Dealer[]>([]);
+	const [selectedDealer, setSelectedDealer] = useState<number | "">("");
+	const [rows, setRows] = useState<RowState[]>([
+		{ product_id: "", component_id: "", components: [], disabled: false },
+	]);
+	const [cart, setCart] = useState<CartItem[]>([]);
+	const [cartNote, setCartNote] = useState("");
+
+	const productsLoading = products.length === 0;
+	const dealersLoading = dealers.length === 0;
+
+	/* ---------------------- Effects (data) --------------------- */
 	useEffect(() => {
 		const fetchProducts = async () => {
 			try {
-				const res = await http.get('/product_variants?all=true');
-				setProducts(res.data.products);
-				console.log("Fetched products:", res.data.products);
-				if (res.data.products.length > 0) {
-					const longestName = res.data.products.reduce((longest, p) => 
-						p.product_name.length > longest.length ? 
-							p.product_name : longest, "");
-					const canvas = document.createElement("canvas");
-					const context = canvas.getContext("2d");
-					if (context) {
-						context.font = "16px Arial"; // Should match the font of the dropdown
-						const width = context.measureText(longestName).width;
-						setDropdownWidth(width + 40); // Add some padding
-					}
-				}
+				const res = await http.get("/product_variants?all=true");
+				setProducts((res.data?.products ?? []) as Product[]);
 			} catch (err) {
 				console.error("Failed to fetch products", err);
 			}
 		};
-
 		const fetchDealers = async () => {
-			const res = await http.get('/dealers');
-			setDealers(res.data);
+			try {
+				const res = await http.get("/dealers");
+				setDealers((res.data ?? []) as Dealer[]);
+			} catch (err) {
+				console.error("Failed to fetch dealers", err);
+			}
 		};
-
 		fetchProducts();
 		fetchDealers();
 	}, []);
 
-	const updateRowProduct = (index: number, product_id: string) => {
-		const product = products.find(p => p.product_id === product_id);
-		const newRows = [...rows];
-		newRows[index].product_id = product_id;
-		newRows[index].components = product?.variants || [];
-		newRows[index].component_id = '';
-		setRows(newRows);
+	/* ---------------------- Row handlers ---------------------- */
+	const updateRowProduct = (index: number, product_id: number | "") => {
+		const product = products.find((p) => p.product_id === product_id);
+		setRows((prev) => {
+			const next = [...prev];
+			next[index] = {
+				product_id,
+				components: product?.variants || [],
+				component_id: "",
+				disabled: prev[index].disabled && !!product_id ? prev[index].disabled : false,
+			};
+			return next;
+		});
 	};
 
-	const updateRowComponent = (index: number, component_id: string) => {
-		const newRows = [...rows];
-		newRows[index].component_id = component_id;
-		setRows(newRows);
+	const updateRowComponent = (index: number, component_id: number | "") => {
+		setRows((prev) => {
+			const next = [...prev];
+			next[index].component_id = component_id;
+			return next;
+		});
 	};
 
 	const addRow = () => {
-		setRows([...rows, { product_id: '', component_id: '', components: [] }]);
+		setRows((prev) => [
+			...prev,
+			{ product_id: "", component_id: "", components: [], disabled: false },
+		]);
 	};
 
 	const removeRow = (index: number) => {
-		setRows(rows.filter((_, i) => i !== index));
+		setRows((prev) => prev.filter((_, i) => i !== index));
 	};
 
+	/* ---------------------- Cart handlers --------------------- */
 	const addToCart = () => {
-		const updatedRows = rows.map(row => {
-			const product = products.find(p => p.product_id === row.product_id);
-			const variant = row.components.find(v => v.attribute_id === row.component_id);
-			if (!product || !variant) return row; // If not a valid row, return as is
+		const updatedRows = rows.map((row) => {
+			const product =
+        row.product_id !== "" ? products.find((p) => p.product_id === row.product_id) : null;
+			const variant =
+        row.component_id !== "" ? row.components.find((v) => v.attribute_id === row.component_id) : null;
 
-			const existing = cart.find(item => item.attribute_id === variant.attribute_id);
-			if (existing) {
-				setCart(prev => prev.map(item => item.attribute_id === variant.attribute_id ?
-					{ ...item, quantity: item.quantity + 1 } : item));
-			} else {
-				setCart(prev => [...prev, {
-					id: product.product_id,
-					name: `${product.product_name} - ${variant.attribute_name}`,
-					price: variant.price,
-					attribute_id: variant.attribute_id,
-					quantity: 1
-				}]);
-			}
-			return { ...row, disabled: true }; // Mark this row as disabled
-		});
-		setRows(updatedRows); // Update the rows state
-	};
+			if (!product || !variant) return row;
 
-	const updateQuantity = (id: number, quantity: number) => {
-		setCart(cart.map(item => item.attribute_id === id ? { ...item, quantity } : item));
-	};
-
-	const removeItem = (id: number) => {
-		// First, update the cart
-		setCart(prevCart => {
-			const updatedCart = prevCart.filter(item => item.attribute_id !== id);
-
-			// Now, find the corresponding row and re-enable it
-			setRows(prevRows => {
-				return prevRows.map(row => {
-					// Assuming component_id in row corresponds to attribute_id in cart item
-					if (row.component_id === id) {
-						return { ...row, disabled: false };
-					}
-					return row;
-				});
+			setCart((prev) => {
+				const exists = prev.find((i) => i.attribute_id === variant.attribute_id);
+				if (exists) {
+					return prev.map((i) =>
+						i.attribute_id === variant.attribute_id ? { ...i, quantity: i.quantity + 1 } : i
+					);
+				}
+				return [
+					...prev,
+					{
+						id: product.product_id,
+						name: `${product.product_name} - ${variant.attribute_name}`,
+						price: variant.price,
+						attribute_id: variant.attribute_id,
+						quantity: 1,
+					},
+				];
 			});
 
-			return updatedCart;
+			return { ...row, disabled: true };
+		});
+
+		setRows(updatedRows);
+	};
+
+	const updateQuantity = (attribute_id: number, quantity: number) => {
+		const qty = Math.max(1, quantity);
+		setCart((prev) =>
+			prev.map((i) => (i.attribute_id === attribute_id ? { ...i, quantity: qty } : i))
+		);
+	};
+
+	const removeItem = (attribute_id: number) => {
+		setCart((prevCart) => {
+			const next = prevCart.filter((i) => i.attribute_id !== attribute_id);
+			setRows((prevRows) =>
+				prevRows.map((r) => (r.component_id === attribute_id ? { ...r, disabled: false } : r))
+			);
+			return next;
 		});
 	};
 
-	const total = cart.reduce((acc, item) => acc + item.quantity * item.price, 0);
+	const total = useMemo(
+		() => cart.reduce((acc, item) => acc + item.quantity * item.price, 0),
+		[cart]
+	);
 
+	/* ----------------------- Submit order ---------------------- */
 	const handleSubmitOrder = async () => {
 		const user_id = parseInt((await getUserId()) || "0", 10);
 		if (!selectedDealer || !user_id || cart.length === 0) return;
 
-		const dealerDetails = dealers.find(d => d.dealer_id === selectedDealer);
-		if (!dealerDetails) return alert("Invalid dealer selected");
+		const dealerDetails = dealers.find((d) => d.dealer_id === selectedDealer);
+		if (!dealerDetails) {
+			alert("Invalid dealer selected");
+			return;
+		}
 
 		try {
-			const response = await http.post('/dealer-quotation-from-cart', {
+			const response = await http.post("/dealer-quotation-from-cart", {
 				dealer: dealerDetails,
 				user_id,
 				total_price: total,
-				cartItems: cart.map(item => ({
+				cartItems: cart.map((item) => ({
 					product_id: item.id,
 					product_attribute_id: item.attribute_id,
 					quantity: item.quantity,
-					unit_price: item.price
+					unit_price: item.price,
 				})),
-				note: cartNote
+				note: cartNote,
 			});
 
-			const newQuoteId = response.data.quote_id;
+			const newQuoteId = response.data?.quote_id;
 			alert("Quotation created successfully!");
 			setCart([]);
 			navigate(`/quotation-items/${newQuoteId}`);
@@ -159,170 +226,303 @@ const POSPage = () => {
 		}
 	};
 
+	const canAddToCart = rows.some((r) => !!r.product_id && !!r.component_id && !r.disabled);
+
 	return (
-		<>
-			<Box sx={{ px: 4, overflowX: 'hidden' }}>
-				<Typography variant="h5" gutterBottom>RO System Point of Sale</Typography>
+		<Paper
+			sx={{
+				position: "fixed",
+				left: isMobile ? 0 : "var(--app-drawer-width, 240px)",
+				top: "var(--app-header-height, 56px)",
+				right: 0,
+				bottom: 100, // Added margin for chatbot
+				display: "flex",
+				flexDirection: "column",
+				borderRadius: 2,
+				boxShadow: 3,
+				overflow: "hidden",
+				bgcolor: "background.paper",
+			}}
+		>
+			{/* Top Bar */}
+			<AppBar position="static" color="transparent" elevation={0} sx={{ flex: "0 0 auto" }}>
+				<Toolbar
+					sx={{
+						minHeight: 56,
+						gap: 2,
+						justifyContent: "flex-start",
+						px: { xs: 1.5, sm: 2 },
+					}}
+				>
+					<Typography variant="h6" sx={{ fontWeight: 700, mr: 1 }}>
+						Point of Sale
+					</Typography>
 
-				<Grid container spacing={4}>
-					<Grid item xs={12} md={8}>
-						<FormControl fullWidth sx={{ mb: 2 }}>
-							<InputLabel>Select Dealer</InputLabel>
-							<Select
-								value={selectedDealer}
+					{/* Dealer typed search */}
+					<Autocomplete
+						disablePortal
+						options={dealers}
+						loading={dealersLoading}
+						getOptionLabel={(opt) => opt?.full_name ?? ""}
+						isOptionEqualToValue={(o, v) => o.dealer_id === v.dealer_id}
+						sx={{ flex: 1, maxWidth: 560 }}
+						value={
+							selectedDealer === "" ? null : dealers.find((d) => d.dealer_id === selectedDealer) ?? null
+						}
+						onChange={(_, newValue) => setSelectedDealer(newValue ? newValue.dealer_id : "")}
+						renderInput={(params) => (
+							<TextField
+								{...params}
+								size="small"
+								fullWidth
 								label="Select Dealer"
-								onChange={(e) => setSelectedDealer(e.target.value)}
-							>
-								{dealers.map(dealer => (
-									<MenuItem key={dealer.dealer_id} value={dealer.dealer_id}>
-										{dealer.full_name}
-									</MenuItem>
-								))}
-							</Select>
-						</FormControl>
+								placeholder={dealersLoading ? "Loading..." : "Type to search"}
+							/>
+						)}
+					/>
+				</Toolbar>
+			</AppBar>
 
-						{rows.map((row, index) => (
-							<Box key={index} sx={{ mb: 2, display: 'flex', gap: 1, flexDirection: { xs: 'column', sm: 'row' } }}>
-								<FormControl sx={{ flexGrow: 1 }}>
-									<Autocomplete
-										options={products}
-										getOptionLabel={(option) => option.product_name}
-										value={products.find(p => p.product_id === row.product_id) || null}
-										onChange={(event, newValue) => {
-											updateRowProduct(index, newValue ? newValue.product_id : '');
-										}}
-										renderInput={(params) => 
-											<TextField {...params} 
-												label="Product" />}
-										PopperComponent={(props) => <div {...props}
-											style={{ width: dropdownWidth }} />}
-										renderOption={(props, option) => (
-											<li {...props} key={option.product_id}>
-												{option.product_name}
-											</li>
-										)}
-										noOptionsText={products.length === 0 ? null : "No options"}
-										disabled={row.disabled}
-									/>
-								</FormControl>
-								<FormControl sx={{ flexGrow: 1 }}>
-									<InputLabel>Component</InputLabel>
-									<Select
-										value={row.component_id}
-										onChange={(e) => updateRowComponent(index, e.target.value)}
-										disabled={row.disabled}
-									>
-										{row.components.map(c => (
-											<MenuItem key={c.attribute_id} value={c.attribute_id}>
-												{c.attribute_name} - ₹{c.price}
-											</MenuItem>
-										))}
-									</Select>
-								</FormControl>
-								<IconButton onClick={() => removeRow(index)} color="error" disabled={row.disabled}>
-									<DeleteIcon />
-								</IconButton>
-							</Box>
-						))}
-						<Stack direction="row" spacing={2} alignItems="center" sx={{ mt: 2 }}>
+			{/* Content: FLEX layout → left grows, cart fixed width */}
+			<Box
+				sx={{
+					flex: "1 1 auto",
+					minHeight: 0,
+					overflow: "hidden",
+					display: "flex",
+					flexDirection: { xs: "column", md: "row" },
+					gap: 2,
+					p: { xs: 1.5, sm: 2 },
+				}}
+			>
+				{/* LEFT: fills all width → BIG inputs */}
+				<Box sx={{ flex: 1, minWidth: 0, overflowY: "auto" }}>
+					<Card
+						variant="outlined"
+						sx={{
+							p: { xs: 2, sm: 2.5 },
+							mb: 2,
+							borderRadius: 3,
+							borderColor: "divider",
+							bgcolor: "grey.50",
+						}}
+					>
+						<Typography variant="subtitle1" fontWeight={800} sx={{ mb: 1.5 }}>
+							Items
+						</Typography>
+
+						{rows.map((row, index) => {
+							const productValue =
+                row.product_id === "" ? null : products.find((p) => p.product_id === row.product_id) ?? null;
+							const componentValue =
+                row.component_id === ""
+                	? null
+                	: row.components.find((c) => c.attribute_id === row.component_id) ?? null;
+
+							return (
+								<Card
+									key={index}
+									variant="outlined"
+									sx={{ p: { xs: 1.5, sm: 2 }, mb: 1.5, borderRadius: 2, background: "#fff" }}
+								>
+									<Stack spacing={1.5}>
+										{/* PRODUCT — XL, full width */}
+										<Autocomplete
+											disablePortal
+											options={products}
+											loading={productsLoading}
+											getOptionLabel={(opt) => opt?.product_name ?? ""}
+											isOptionEqualToValue={(o, v) => o.product_id === v.product_id}
+											value={productValue}
+											onChange={(_, newValue) =>
+												updateRowProduct(index, newValue ? newValue.product_id : "")
+											}
+											renderInput={(params) => (
+												<TextField
+													{...params}
+													label="Product"
+													fullWidth
+													placeholder={productsLoading ? "Loading..." : "Type to search product"}
+													sx={inputXL}
+												/>
+											)}
+											disabled={row.disabled}
+											// make the dropdown wide too
+											slotProps={{ paper: { sx: { minWidth: 720 } } }}
+										/>
+
+										{/* COMPONENT — XL, full width */}
+										<Autocomplete
+											disablePortal
+											options={row.components}
+											getOptionLabel={(opt) =>
+												opt ? `${opt.attribute_name} — ${toINR(opt.price)}` : ""
+											}
+											isOptionEqualToValue={(o, v) => o.attribute_id === v.attribute_id}
+											value={componentValue}
+											onChange={(_, newValue) =>
+												updateRowComponent(index, newValue ? newValue.attribute_id : "")
+											}
+											renderInput={(params) => (
+												<TextField
+													{...params}
+													label="Component"
+													fullWidth
+													placeholder="Pick a variant"
+													sx={inputXL}
+												/>
+											)}
+											disabled={row.disabled || !row.product_id}
+											slotProps={{ paper: { sx: { minWidth: 720 } } }}
+										/>
+
+										{/* Row actions */}
+										<Stack direction="row" spacing={1} justifyContent="flex-end">
+											{row.disabled && (
+												<Chip size="small" color="success" label="Added" sx={{ fontWeight: 700 }} />
+											)}
+											<IconButton onClick={() => removeRow(index)} color="error" disabled={rows.length === 1}>
+												<DeleteIcon />
+											</IconButton>
+										</Stack>
+									</Stack>
+								</Card>
+							);
+						})}
+
+						{/* Big actions */}
+						<Stack
+							direction={{ xs: "column", sm: "row" }}
+							spacing={1.5}
+							sx={{ mt: 1 }}
+							alignItems={{ xs: "stretch", sm: "center" }}
+						>
 							<Button
 								variant="outlined"
 								startIcon={<AddCircleOutlineIcon />}
 								onClick={addRow}
+								size="large"
+								sx={{ fontWeight: 800, py: 1.25 }}
+								fullWidth={isMobile}
 							>
-								Add Another Product
+								Add Product
 							</Button>
-							<Button variant="contained" onClick={addToCart}>Add All to Cart</Button>
-						</Stack>
-					</Grid>
-
-					<Grid item xs={12} md={4} sx={{ bgcolor: '#f8f8f8', p: 3, borderRadius: 2 }}>
-						<Paper elevation={3} sx={{ p: 2, position: 'sticky', top: 100, minWidth: 500 }}>
-							<Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-								<ShoppingCartIcon sx={{ mr: 1 }} /> Cart
-							</Typography>
-							<Divider sx={{ my: 2 }} />
-							{cart.length === 0 ? (
-								<Typography>Your cart is empty</Typography>
-							) : (
-								cart.map(item => (
-									<Paper key={item.attribute_id} elevation={1} sx={{
-										display: 'flex',
-										alignItems: 'center',
-										mb: 2,
-										pb: 2,
-										borderBottom: '1px solid #eee'
-									}}>										
-										<Box sx={{ flexGrow: 1 }}>
-											<Typography variant="body1" 
-												fontWeight="bold">{item.name}</Typography>
-											<Typography variant="body2" 
-												color="text.secondary">Price: ₹{item.price}</Typography>
-										</Box>
-										<Box sx={{ display: 'flex', alignItems: 'center', mx: 2 }}>
-											<IconButton 
-												size="small" 
-												onClick={() => updateQuantity(item.attribute_id, item.quantity - 1)} 
-												disabled={item.quantity <= 1}
-											>
-												<RemoveIcon />
-											</IconButton>
-											<Typography sx={{ mx: 1 }}>{item.quantity}</Typography>
-											<IconButton 
-												size="small" 
-												onClick={() => updateQuantity(item.attribute_id, item.quantity + 1)}
-											>
-												<AddIcon />
-											</IconButton>
-										</Box>
-										<Typography 
-											variant="body1" 
-											sx={{ minWidth: 80, textAlign: 'right' }}
-										>
-											₹{item.price * item.quantity}
-										</Typography>
-										<IconButton 
-											onClick={() => removeItem(item.attribute_id)} 
-											color="error" 
-											sx={{ ml: 2 }}
-										>
-											<DeleteIcon />
-										</IconButton>
-									</Paper>
-								))
-							)}
-							<Divider sx={{ my: 2 }} />
-							<TextField
-								label="Notes for Quotation"
-								variant="outlined"
-								fullWidth
-								multiline
-								minRows={3}
-								value={cartNote}
-								onChange={(e) => setCartNote(e.target.value)}
-								sx={{ mt: 2, mb: 2 }}
-							/>
-							<Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
-								<Typography variant="h6" color="primary" fontWeight="bold">Subtotal:</Typography>
-								<Typography variant="h6" color="primary" fontWeight="bold">₹{total}</Typography>
-							</Box>
 							<Button
 								variant="contained"
-								color="primary"
-								fullWidth
-								disabled={cart.length === 0 || !selectedDealer}
-								onClick={handleSubmitOrder}
+								onClick={addToCart}
+								disabled={!canAddToCart}
 								size="large"
-								sx={{ mt: 2, py: 1.5, fontWeight: 'bold', fontSize: '1.1rem' }}
+								sx={{ fontWeight: 800, py: 1.25 }}
+								fullWidth={isMobile}
 							>
-								Proceed to Checkout
+								Add Selected to Cart
 							</Button>
-						</Paper>
-					</Grid>
-				</Grid>
-			</Box>
-		</>
-	);
-};
+						</Stack>
+					</Card>
+				</Box>
 
-export default POSPage;
+				{/* RIGHT: fixed width cart on desktop → left stays huge */}
+				<Box
+					sx={{
+						width: { xs: "100%", md: 460, lg: 520 }, // fixed width sidebar
+						flexShrink: 0,
+						display: "flex",
+						flexDirection: "column",
+						bgcolor: "grey.50",
+						borderRadius: 2,
+						p: 2,
+						overflow: "hidden",
+					}}
+				>
+					<Typography variant="h6" gutterBottom sx={{ display: "flex", alignItems: "center" }}>
+						<ShoppingCartIcon sx={{ mr: 1 }} /> Cart
+					</Typography>
+					<Divider sx={{ mb: 2 }} />
+
+					<Box sx={{ flexGrow: 1, overflowY: "auto", pr: 0.5 }}>
+						{cart.length === 0 ? (
+							<Typography color="text.secondary">Your cart is empty</Typography>
+						) : (
+							cart.map((item) => (
+								<Card
+									key={item.attribute_id}
+									variant="outlined"
+									sx={{ display: "flex", alignItems: "center", p: 1.25, mb: 1, borderRadius: 2 }}
+								>
+									<Box sx={{ flexGrow: 1, minWidth: 0 }}>
+										<Typography variant="body1" fontWeight="bold" noWrap title={item.name}>
+											{item.name}
+										</Typography>
+										<Typography variant="body2" color="text.secondary">
+											Price: {toINR(item.price)}
+										</Typography>
+									</Box>
+
+									<Stack direction="row" alignItems="center" sx={{ mx: 1 }}>
+										<IconButton
+											size="small"
+											onClick={() => updateQuantity(item.attribute_id, item.quantity - 1)}
+											disabled={item.quantity <= 1}
+										>
+											<RemoveIcon fontSize="small" />
+										</IconButton>
+										<Typography sx={{ mx: 1, minWidth: 20, textAlign: "center" }}>
+											{item.quantity}
+										</Typography>
+										<IconButton
+											size="small"
+											onClick={() => updateQuantity(item.attribute_id, item.quantity + 1)}
+										>
+											<AddIcon fontSize="small" />
+										</IconButton>
+									</Stack>
+
+									<Typography
+										variant="body1"
+										sx={{ minWidth: 96, textAlign: "right", fontWeight: "bold" }}
+									>
+										{toINR(item.price * item.quantity)}
+									</Typography>
+
+									<IconButton onClick={() => removeItem(item.attribute_id)} color="error" sx={{ ml: 1 }}>
+										<DeleteIcon />
+									</IconButton>
+								</Card>
+							))
+						)}
+					</Box>
+
+					<Box sx={{ pt: 2, mt: "auto" }}>
+						<TextField
+							label="Notes for Quotation"
+							variant="outlined"
+							fullWidth
+							multiline
+							rows={2}
+							value={cartNote}
+							onChange={(e) => setCartNote(e.target.value)}
+							sx={{ mb: 2 }}
+						/>
+						<Stack direction="row" justifyContent="space-between" sx={{ mb: 2 }}>
+							<Typography variant="h6">Subtotal:</Typography>
+							<Typography variant="h6" fontWeight="bold">
+								{toINR(total)}
+							</Typography>
+						</Stack>
+						<Button
+							variant="contained"
+							color="primary"
+							fullWidth
+							disabled={cart.length === 0 || !selectedDealer}
+							onClick={handleSubmitOrder}
+							size="large"
+							sx={{ py: 1.5, fontWeight: "bold" }}
+						>
+							Proceed to Checkout
+						</Button>
+					</Box>
+				</Box>
+			</Box>
+		</Paper>
+	);
+}

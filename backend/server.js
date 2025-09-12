@@ -155,7 +155,7 @@ const followupsRouter = require('./routes/followups');
 app.use('/api/followups', followupsRouter);
 
 // Orders
-const postoorderRoutes = require('./routes/orders');
+const postoorderRoutes = require('./routes/orders')(db);
 app.use('/api/orders', postoorderRoutes);
 
 // Product Attributes / Variants
