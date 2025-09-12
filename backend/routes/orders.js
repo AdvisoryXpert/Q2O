@@ -58,4 +58,88 @@ router.post('/', (req, res) => {
   });
 });
 
+
+// GET a specific order by ID
+router.get('/:orderId', (req, res) => {
+  const { orderId } = req.params;
+  const tenant_id = req.tenant_id;
+
+  const query = `
+    SELECT 
+      o.order_id,
+      o.customer_name,
+      o.dealer_id,
+      d.full_name as dealer_name,
+      o.date_created,
+      o.status,
+      o.invoice_id
+    FROM orders o
+    LEFT JOIN dealer d ON o.dealer_id = d.dealer_id
+    WHERE o.order_id = ? AND o.tenant_id = ?;
+  `;
+
+  db.query(query, [orderId, tenant_id], (err, results) => {
+    if (err) {
+      console.error('Failed to fetch order:', err);
+      return res.status(500).json({ error: 'Failed to fetch order' });
+    }
+    if (results.length === 0) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+    res.json(results[0]);
+  });
+});
+
+// GET line items for a specific order
+router.get('/:orderId/items', (req, res) => {
+  const { orderId } = req.params;
+  const tenant_id = req.tenant_id;
+
+  const query = 'SELECT * FROM order_line WHERE order_id = ? AND tenant_id = ?';
+  db.query(query, [orderId, tenant_id], (err, results) => {
+    if (err) {
+      console.error('Failed to fetch order line items:', err);
+      return res.status(500).json({ error: 'Failed to fetch order line items' });
+    }
+    res.json(results);
+  });
+});
+
+// PUT (update) an existing order
+router.put('/:orderId', (req, res) => {
+  const { orderId } = req.params;
+  const { customer_name, status } = req.body;
+  const tenant_id = req.tenant_id;
+
+  if (!customer_name && !status) {
+    return res.status(400).json({ error: 'No fields to update' });
+  }
+
+  // Build the update query dynamically
+  const fields = [];
+  const values = [];
+  if (customer_name) {
+    fields.push('customer_name = ?');
+    values.push(customer_name);
+  }
+  if (status) {
+    fields.push('status = ?');
+    values.push(status);
+  }
+  values.push(orderId, tenant_id);
+
+  const query = `UPDATE orders SET ${fields.join(', ')} WHERE order_id = ? AND tenant_id = ?`;
+
+  db.query(query, values, (err, result) => {
+    if (err) {
+      console.error('Failed to update order:', err);
+      return res.status(500).json({ error: 'Failed to update order' });
+    }
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Order not found or no changes made' });
+    }
+    res.json({ message: 'Order updated successfully' });
+  });
+});
+
 module.exports = router;
