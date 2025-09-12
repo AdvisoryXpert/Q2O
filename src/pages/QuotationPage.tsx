@@ -1,9 +1,9 @@
+// src/pages/QuotationPage.tsx
 import { useEffect, useMemo, useState } from "react";
 import {
 	AppBar,
 	Avatar,
 	Box,
-	Button,
 	Card,
 	CardContent,
 	Chip,
@@ -18,52 +18,73 @@ import {
 	useMediaQuery,
 	useTheme,
 } from "@mui/material";
-import {
-	DataGrid,
-	GridColDef,
-	GridToolbar,
-} from "@mui/x-data-grid";
+import { DataGrid, GridColDef, GridToolbar } from "@mui/x-data-grid";
 import SearchIcon from "@mui/icons-material/Search";
 import DeleteIcon from "@mui/icons-material/Delete";
-import AddIcon from "@mui/icons-material/Add";
 import FilterListIcon from "@mui/icons-material/FilterList";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import CancelIcon from "@mui/icons-material/Cancel";
+import DraftsIcon from "@mui/icons-material/Drafts";
+import SendIcon from "@mui/icons-material/Send";
+import VisibilityIcon from "@mui/icons-material/Visibility";
 import { http } from "../lib/http";
 import { useNavigate } from "react-router-dom";
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import CancelIcon from '@mui/icons-material/Cancel';
-import DraftsIcon from '@mui/icons-material/Drafts';
-import SendIcon from '@mui/icons-material/Send';
-import VisibilityIcon from '@mui/icons-material/Visibility';
 
-/** Types */
+/* ---------------- utilities (safe formatting) ---------------- */
+function safeDate(d?: string | null) {
+	if (!d) return "-";
+	const t = Date.parse(d);
+	if (Number.isNaN(t)) return "-";
+	return new Date(t).toLocaleString();
+}
+
+function toINR(n?: number | null) {
+	if (typeof n !== "number" || Number.isNaN(n)) return "₹0";
+	return n.toLocaleString("en-IN", {
+		style: "currency",
+		currency: "INR",
+		maximumFractionDigits: 0,
+	});
+}
+
+/* ---------------- types ---------------- */
 type Quote = {
   quote_id: number;
-  user_id: number;
-  dealer_id: number | null;
-  total_price: number;
-  date_created: string;
-  status: 'draft' | 'sent' | 'accepted' | 'rejected';
+  dealer_id?: number | string | null;
+  dealer_name?: string | null;
+  date_created?: string | null;
+  total_price?: number | null;
+  status?: string | null;
 };
-
-/** API helpers */
-async function fetchQuotes(dealerId?: number | string | null, limit?: number): Promise<Quote[]> {
-	let path = dealerId
-		? `/quotestoorder/quotes_by_dealer/${dealerId}`
-		: `/quotestoorder/quotes_dtls`;
-	if (limit) {
-		path += `?limit=${limit}`;
-	}
-	const { data } = await http.get(path);
-	return data ?? [];
-}async function deleteQuote(id: number) {
-	await http.delete(`/quotestoorder/${id}`);
-}
 
 type Props = {
   dealerId?: number | string | null;
   limit?: number;
 };
 
+/* ---------------- api helpers ---------------- */
+async function fetchQuotes(limit?: number): Promise<Quote[]> {
+	try {
+		const r = await http.get(`/quotes-raw${limit ? `?limit=${limit}` : ""}`);
+		return (r?.data ?? []) as Quote[];
+	} catch {
+		return [];
+	}
+}
+
+async function deleteQuote(id: number) {
+	await http.delete(`/quotestoorder/${id}`);
+}
+
+/* Small helpers to be compatible with both MUI X APIs */
+const getRowArg = (args: any[]) =>
+  (args[1] /* new API: (value, row) */
+    ?? (args[0] && typeof args[0] === "object" && "row" in args[0] ? (args[0] as any).row : undefined) /* old API: (params) */
+  ) as Quote | undefined;
+const getValueArg = (args: any[]) =>
+	(args[0] && typeof args[0] === "object" && "value" in args[0] ? (args[0] as any).value : args[0]); // old vs new
+
+/* ============================================================ */
 export default function QuotationPage({ dealerId, limit }: Props) {
 	const theme = useTheme();
 	const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -78,83 +99,144 @@ export default function QuotationPage({ dealerId, limit }: Props) {
 		(async () => {
 			try {
 				setLoading(true);
-				setRows(await fetchQuotes(dealerId, limit));
 				setError(null);
+
+				const data = await fetchQuotes(limit);
+				const byDealer =
+          dealerId == null
+          	? data
+          	: data.filter((q) => String(q.dealer_id ?? "") === String(dealerId ?? ""));
+
+				const sorted = [...byDealer].sort((a, b) => {
+					const da = a?.date_created ? Date.parse(a.date_created) : NaN;
+					const db = b?.date_created ? Date.parse(b.date_created) : NaN;
+					if (!Number.isNaN(db) && !Number.isNaN(da)) return db - da;
+					return (b?.quote_id ?? 0) - (a?.quote_id ?? 0);
+				});
+
+				setRows(limit ? sorted.slice(0, limit) : sorted);
 			} catch {
 				setError("Failed to load quotations.");
 			} finally {
 				setLoading(false);
 			}
 		})();
-	}, [dealerId]);
+	}, [dealerId, limit]);
 
+	/* ---------------- search ---------------- */
 	const filtered = useMemo(() => {
 		const q = search.trim().toLowerCase();
 		if (!q) return rows;
 		return rows.filter((d) =>
-			[d.quote_id, d.dealer_id, d.status]
+			[d.quote_id, d.dealer_id, d.dealer_name, d.status, safeDate(d.date_created), toINR(d.total_price)]
 				.filter(Boolean)
 				.some((v) => String(v).toLowerCase().includes(q))
 		);
 	}, [rows, search]);
 
+	/* ---------------- actions ---------------- */
 	const handleDelete = async (d: Quote) => {
 		if (window.confirm(`Delete Quotation "${d.quote_id}"?`)) {
 			try {
 				await deleteQuote(d.quote_id);
 				setRows((prev) => prev.filter((r) => r.quote_id !== d.quote_id));
 			} catch {
-				window.alert("Failed to delete Quotation. Please try again.");
+				window.alert("Failed to delete quotation. Please try again.");
 			}
 		}
 	};
 
-	/** DataGrid columns (desktop) */
+	/* ---------------- grid columns (v8-safe) ---------------- */
 	const columns: GridColDef[] = [
+		{ field: "quote_id", headerName: "Quote ID", flex: 0.7, minWidth: 120 },
 		{
-			field: "quote_id",
-			headerName: "Quote ID",
+			field: "dealer",
+			headerName: "Dealer",
 			flex: 1,
-			minWidth: 150,
-		},
-		{
-			field: "dealer_id",
-			headerName: "Dealer ID",
-			flex: 1,
-			minWidth: 150,
+			minWidth: 160,
+			// new API: (value, row), old API: (params)
+			valueGetter: ((...args: any[]) => {
+				const row = getRowArg(args);
+				return row?.dealer_name ?? row?.dealer_id ?? "-";
+			}) as any,
 		},
 		{
 			field: "date_created",
 			headerName: "Date Created",
 			flex: 1,
-			minWidth: 150,
-			valueFormatter: (params) => new Date(params.value as string).toLocaleDateString(),
+			minWidth: 180,
+			valueFormatter: ((...args: any[]) => {
+				const value = getValueArg(args) as string | null | undefined;
+				return safeDate(value ?? null);
+			}) as any,
 		},
 		{
 			field: "total_price",
 			headerName: "Total Price",
-			flex: 1,
-			minWidth: 150,
-			valueFormatter: (params) => `₹${Number(params.value).toFixed(2)}`,
+			flex: 0.8,
+			minWidth: 140,
+			valueFormatter: ((...args: any[]) => {
+				const value = getValueArg(args) as number | null | undefined;
+				return toINR(value ?? null);
+			}) as any,
 		},
 		{
 			field: "status",
 			headerName: "Status",
-			flex: 1,
+			flex: 0.8,
 			minWidth: 120,
-			renderCell: (p) => {
-				const status = p.value as Quote['status'];
-				switch (status) {
-				case 'accepted':
-					return <Chip icon={<CheckCircleIcon />} label="Accepted" color="success" variant="outlined" size="small" />;
-				case 'rejected':
-					return <Chip icon={<CancelIcon />} label="Rejected" color="error" variant="outlined" size="small" />;
-				case 'sent':
-					return <Chip icon={<SendIcon />} label="Sent" color="warning" variant="outlined" size="small" />;
-				default:
-					return <Chip icon={<DraftsIcon />} label="Draft" color="warning" variant="outlined" size="small" />;
+			renderCell: ((...args: any[]) => {
+				const value = getValueArg(args);
+				const row = getRowArg(args);
+				const s = String(value ?? row?.status ?? "").toLowerCase();
+
+				if (s.includes("accept") || s === "approved") {
+					return (
+						<Chip
+							icon={<CheckCircleIcon />}
+							label="Accepted"
+							color="success"
+							variant="outlined"
+							size="small"
+							sx={{ fontWeight: 700 }}
+						/>
+					);
 				}
-			}
+				if (s.includes("reject") || s === "cancelled" || s === "canceled") {
+					return (
+						<Chip
+							icon={<CancelIcon />}
+							label="Rejected"
+							color="error"
+							variant="outlined"
+							size="small"
+							sx={{ fontWeight: 700 }}
+						/>
+					);
+				}
+				if (s.includes("sent")) {
+					return (
+						<Chip
+							icon={<SendIcon />}
+							label="Sent"
+							color="warning"
+							variant="outlined"
+							size="small"
+							sx={{ fontWeight: 700 }}
+						/>
+					);
+				}
+				return (
+					<Chip
+						icon={<DraftsIcon />}
+						label="Draft"
+						color="warning"
+						variant="outlined"
+						size="small"
+						sx={{ fontWeight: 700 }}
+					/>
+				);
+			}) as any,
 		},
 		{
 			field: "actions",
@@ -164,172 +246,194 @@ export default function QuotationPage({ dealerId, limit }: Props) {
 			disableColumnMenu: true,
 			minWidth: 140,
 			flex: 0.9,
-			renderCell: (p) => {
-				const d = p.row as Quote;
+			renderCell: ((...args: any[]) => {
+				const row = getRowArg(args)!;
 				return (
 					<Box sx={{ display: "flex", gap: 0.5 }}>
 						<Tooltip title="View">
-							<IconButton size="small" onClick={() => navigate(`/quotation-items/${d.quote_id}`)}>
+							<IconButton size="small" onClick={() => navigate(`/quotation-items/${row.quote_id}`)}>
 								<VisibilityIcon fontSize="small" />
 							</IconButton>
 						</Tooltip>
 						<Tooltip title="Delete">
-							<IconButton size="small" color="error" onClick={() => handleDelete(d)}>
+							<IconButton size="small" color="error" onClick={() => handleDelete(row)}>
 								<DeleteIcon fontSize="small" />
 							</IconButton>
 						</Tooltip>
 					</Box>
 				);
-			},
+			}) as any,
 		},
 	];
 
 	const gridRows = useMemo(() => filtered.map((d) => ({ id: d.quote_id, ...d })), [filtered]);
 
+	/* ---------------- render ---------------- */
 	return (
-		<>
-			<Paper
-				sx={{
-					position: "fixed",
-					left: isMobile ? 0 : "var(--app-drawer-width, 240px)",
-					top: "var(--app-header-height, 56px)",
-					right: 0,
-					bottom: 0,
-					display: "flex",
-					flexDirection: "column",
-					borderRadius: 2,
-					boxShadow: 3,
-					overflow: "hidden",
-					bgcolor: "background.paper",
-				}}
-			>
-				{/* TOP BAR */}
-				<AppBar position="static" color="transparent" elevation={0} sx={{ flex: "0 0 auto" }}>
-					<Toolbar sx={{ minHeight: 56, gap: 1, justifyContent: "space-between" }}>
-						<Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
-							<TextField
-								value={search}
-								onChange={(e) => setSearch(e.target.value)}
-								size="medium"
-								placeholder="Search..."
-								InputProps={{
-									startAdornment: (
-										<InputAdornment position="start">
-											<SearchIcon fontSize="small" />
-										</InputAdornment>
-									),
-								}}
-								sx={{ width: { xs: 220, sm: 320, md: 420 } }}
-							/>
-							<Button
-								startIcon={<AddIcon />}
-								variant="contained"
-								onClick={() => navigate('/quotation-from-cart')}
-								sx={{
-									textTransform: "none",
-									fontWeight: 700,
-								}}
-							>
-								New Quotation
-							</Button>
-						</Box>
+		<Paper
+			sx={{
+				position: "fixed",
+				left: isMobile ? 0 : "var(--app-drawer-width, 240px)",
+				top: "var(--app-header-height, 56px)",
+				right: 0,
+				bottom: 0,
+				display: "flex",
+				flexDirection: "column",
+				borderRadius: 2,
+				boxShadow: 3,
+				overflow: "hidden",
+				bgcolor: "background.paper",
+			}}
+		>
+			{/* TOP BAR */}
+			<AppBar position="static" color="transparent" elevation={0} sx={{ flex: "0 0 auto" }}>
+				<Toolbar sx={{ minHeight: 56, gap: 1, justifyContent: "space-between" }}>
+					<TextField
+						value={search}
+						onChange={(e) => setSearch(e.target.value)}
+						size="medium"
+						placeholder="Search quotes…"
+						InputProps={{
+							startAdornment: (
+								<InputAdornment position="start">
+									<SearchIcon fontSize="small" />
+								</InputAdornment>
+							),
+						}}
+						sx={{ width: { xs: 220, sm: 360, md: 480 } }}
+					/>
 
-						{/* Filter (right) */}
-						<Tooltip title="Open column filters">
-							<IconButton
-								size="small"
-								onClick={() => {
-									const el = document.querySelector('[data-testid="Open filter panel"]') as HTMLElement | null;
-									el?.click();
-								}}
-							>
-								<FilterListIcon />
-							</IconButton>
-						</Tooltip>
-					</Toolbar>
-				</AppBar>
-
-				{/* CONTENT */}
-				<Box sx={{ flex: "1 1 auto", minHeight: 0, overflow: "auto", p: 1.25 }}>
-					{error && (
-						<Typography color="error" sx={{ mb: 1 }}>
-							{error}
-						</Typography>
-					)}
-
-					{!isMobile ? (
-						<DataGrid
-							columns={columns}
-							rows={gridRows}
-							loading={loading}
-							disableColumnMenu
-							rowSelection={false}
-							hideFooter
-							slots={{ toolbar: GridToolbar }}
-							slotProps={{ toolbar: { showQuickFilter: false } }}
-							columnHeaderHeight={52}
-							rowHeight={56}
-							sx={{
-								borderRadius: 2,
-								backgroundColor: "background.paper",
-								fontSize: ".95rem",
-								"& .MuiDataGrid-columnHeaders": {
-									fontWeight: 800,
-									background:
-                    "linear-gradient(90deg, rgba(7,71,166,0.07) 0%, rgba(7,71,166,0.03) 100%)",
-								},
-								"& .MuiDataGrid-columnHeaderTitle": { fontWeight: 800 },
-								"& .MuiDataGrid-cell": {
-									whiteSpace: "nowrap",
-									overflow: "hidden",
-									textOverflow: "ellipsis",
-								},
-								"& .MuiDataGrid-row:nth-of-type(even)": {
-									backgroundColor: "rgba(0,0,0,0.02)",
-								},
-								"& .MuiDataGrid-row:hover": {
-									backgroundColor: "rgba(7,71,166,0.06)",
-								},
-							}}
-							autoHeight={gridRows.length <= 14}
-						/>
-					) : (
-						<Box
-							sx={{
-								overflowY: "auto",
-								height: "100%",
-								pr: 0.5,
-								"&::-webkit-scrollbar": { width: 6 },
-								"&::-webkit-scrollbar-thumb": { background: theme.palette.grey[400], borderRadius: 3 },
+					<Tooltip title="Open column filters">
+						<IconButton
+							size="small"
+							onClick={() => {
+								const el = document.querySelector(
+									'[data-testid="Open filter panel"]'
+								) as HTMLElement | null;
+								el?.click();
 							}}
 						>
-							<Grid container spacing={1}>
-								{filtered.map((d) => (
-									<Grid item xs={12} key={d.quote_id}>
-										<Card variant="outlined" sx={{ borderRadius: 2 }}>
-											<CardContent sx={{ py: 1.25 }}>
-												<Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
-													<Avatar sx={{ width: 32, height: 32, mr: 1, bgcolor: "primary.main" }}>
-														{d.quote_id.toString()?.[0] ?? "?"}
-													</Avatar>
-													<Box sx={{ minWidth: 0, flex: 1 }}>
-														<Typography fontWeight={700} noWrap title={d.quote_id.toString()}>
-															{d.quote_id}
-														</Typography>
-														<Typography variant="caption" color="text.secondary" noWrap>
-															{d.dealer_id}
-														</Typography>
-													</Box>
+							<FilterListIcon />
+						</IconButton>
+					</Tooltip>
+				</Toolbar>
+			</AppBar>
+
+			{/* CONTENT */}
+			<Box sx={{ flex: "1 1 auto", minHeight: 0, overflow: "auto", p: 1.25 }}>
+				{error && (
+					<Typography color="error" sx={{ mb: 1 }}>
+						{error}
+					</Typography>
+				)}
+
+				{!isMobile ? (
+					<DataGrid
+						columns={columns}
+						rows={gridRows}
+						loading={loading}
+						disableColumnMenu
+						rowSelection={false}
+						hideFooter
+						slots={{ toolbar: GridToolbar }}
+						slotProps={{ toolbar: { showQuickFilter: false } }}
+						columnHeaderHeight={52}
+						rowHeight={56}
+						sx={{
+							borderRadius: 2,
+							backgroundColor: "background.paper",
+							fontSize: ".95rem",
+							"& .MuiDataGrid-columnHeaders": {
+								fontWeight: 800,
+								background:
+                  "linear-gradient(90deg, rgba(7,71,166,0.07) 0%, rgba(7,71,166,0.03) 100%)",
+							},
+							"& .MuiDataGrid-columnHeaderTitle": { fontWeight: 800 },
+							"& .MuiDataGrid-cell": {
+								whiteSpace: "nowrap",
+								overflow: "hidden",
+								textOverflow: "ellipsis",
+							},
+							"& .MuiDataGrid-row:nth-of-type(even)": {
+								backgroundColor: "rgba(0,0,0,0.02)",
+							},
+							"& .MuiDataGrid-row:hover": {
+								backgroundColor: "rgba(7,71,166,0.06)",
+							},
+						}}
+						autoHeight={gridRows.length <= 14}
+					/>
+				) : (
+					<Box
+						sx={{
+							overflowY: "auto",
+							height: "100%",
+							pr: 0.5,
+							"&::-webkit-scrollbar": { width: 6 },
+							"&::-webkit-scrollbar-thumb": {
+								background: theme.palette.grey[400],
+								borderRadius: 3,
+							},
+						}}
+					>
+						<Grid container spacing={1}>
+							{filtered.map((d) => (
+								<Grid item xs={12} key={d.quote_id}>
+									<Card variant="outlined" sx={{ borderRadius: 2 }}>
+										<CardContent sx={{ py: 1.25 }}>
+											<Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+												<Avatar sx={{ width: 32, height: 32, mr: 1, bgcolor: "primary.main" }}>
+													{d.quote_id.toString()?.[0] ?? "?"}
+												</Avatar>
+												<Box sx={{ minWidth: 0, flex: 1 }}>
+													<Typography fontWeight={700} noWrap title={d.quote_id.toString()}>
+														{d.quote_id}
+													</Typography>
+													<Typography variant="caption" color="text.secondary" noWrap>
+														{d.dealer_name ?? d.dealer_id ?? "-"}
+													</Typography>
 												</Box>
-											</CardContent>
-										</Card>
-									</Grid>
-								))}
-							</Grid>
-						</Box>
-					)}
-				</Box>
-			</Paper>
-		</>
+												<Chip size="small" label={String(d.status ?? "Draft")} variant="outlined" />
+											</Box>
+
+											<Grid container spacing={1}>
+												<Grid item xs={6}>
+													<Typography variant="caption" color="text.secondary">
+														Date
+													</Typography>
+													<Typography variant="body2">{safeDate(d.date_created)}</Typography>
+												</Grid>
+												<Grid item xs={6}>
+													<Typography variant="caption" color="text.secondary">
+														Total
+													</Typography>
+													<Typography variant="body2">{toINR(d.total_price)}</Typography>
+												</Grid>
+											</Grid>
+
+											<Box sx={{ mt: 1, display: "flex", gap: 0.5, justifyContent: "flex-end" }}>
+												<Tooltip title="View">
+													<IconButton
+														size="small"
+														onClick={() => navigate(`/quotation-items/${d.quote_id}`)}
+													>
+														<VisibilityIcon fontSize="small" />
+													</IconButton>
+												</Tooltip>
+												<Tooltip title="Delete">
+													<IconButton size="small" color="error" onClick={() => handleDelete(d)}>
+														<DeleteIcon fontSize="small" />
+													</IconButton>
+												</Tooltip>
+											</Box>
+										</CardContent>
+									</Card>
+								</Grid>
+							))}
+						</Grid>
+					</Box>
+				)}
+			</Box>
+		</Paper>
 	);
 }
