@@ -83,3 +83,19 @@ router.post('/', (req, res) => {
 });
 
 module.exports = router;
+
+// GET all employees (tenant-scoped)
+router.get('/users', (req, res) => {
+  const sql = `
+    SELECT user_id, full_name
+    FROM ro_cpq.users
+    WHERE tenant_id = ?
+  `;
+  db.query(sql, [req.tenant_id], (err, results) => {
+    if (err) {
+      console.error('Fetch employees error:', err);
+      return res.status(500).json({ error: 'Failed to fetch employees' });
+    }
+    res.json(results);
+  });
+});
