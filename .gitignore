@@ -9,7 +9,8 @@
 /build
 /dist
 *.tgz
-
+*.pem
+*.cnf
 # misc
 .DS_Store
 .env.local
