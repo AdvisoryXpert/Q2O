@@ -28,7 +28,7 @@ type Order = {
   total_price?: number | null;
 };
 
-type TimeRange = "7d" | "30d" | "90d";
+type TimeRange = "7d" | "30d" | "90d" | "quarterly" | "yearly";
 type Metric = "count" | "revenue";
 
 const START_OF_DAY = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -47,6 +47,9 @@ function labelWeek(d: Date) {
 	const end = new Date(d);
 	end.setDate(end.getDate() + 6);
 	return `${labelDay(d)}–${labelDay(end)}`;
+}
+function labelMonth(d: Date) {
+	return d.toLocaleDateString(undefined, { month: "short", year: "numeric" });
 }
 
 function pickTopStatuses(orders: Order[], k = 5): string[] {
@@ -71,10 +74,12 @@ function normalizeOrdersPayload(payload: any): Order[] {
 	return [];
 }
 
+const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884d8"];
+
 export default function OrdersOverview() {
 	const [loading, setLoading] = useState(true);
 	const [orders, setOrders] = useState<Order[]>([]);
-	const [range, setRange] = useState<TimeRange>("7d");
+	const [range, setRange] = useState<TimeRange>("90d");
 	const [metric, setMetric] = useState<Metric>("count");
 	const [error, setError] = useState<string | null>(null);
 
@@ -83,28 +88,10 @@ export default function OrdersOverview() {
 			setLoading(true);
 			setError(null);
 			try {
-				// Try a few likely endpoints; normalize whatever we get.
-				const candidates = [
-					"/orders/overview",
-					"/orders/summary",
-					"/orders",
-					"/recentorders",
-				];
-				let found: Order[] = [];
-				for (const url of candidates) {
-					try {
-						const r = await http.get(url);
-						const rows = normalizeOrdersPayload(r?.data);
-						if (rows.length) {
-							found = rows;
-							break;
-						}
-					} catch (e) {
-						console.error(e);
-					}
-				}
-				setOrders(found);
-				if (!found.length) setError("No orders found for the selected range.");
+				const r = await http.get("/recentorders");
+				const rows = normalizeOrdersPayload(r?.data);
+				setOrders(rows);
+				if (!rows.length) setError("No orders found for the selected range.");
 			} catch (e) {
 				console.error(e);
 				setError("Failed to fetch orders.");
@@ -127,6 +114,13 @@ export default function OrdersOverview() {
 		if (range === "7d") from.setDate(now.getDate() - 6);
 		if (range === "30d") from.setDate(now.getDate() - 29);
 		if (range === "90d") from.setDate(now.getDate() - 89);
+		if (range === "quarterly") {
+			const quarter = Math.floor(now.getMonth() / 3);
+			from.setMonth(quarter * 3, 1);
+		}
+		if (range === "yearly") {
+			from.setFullYear(now.getFullYear(), 0, 1);
+		}
 
     type Bucket = { key: string; start: Date; values: Record<string, number> };
     const buckets: Bucket[] = [];
@@ -142,7 +136,13 @@ export default function OrdersOverview() {
     		const day = new Date(d);
     		pushBucket(day, labelDay(day));
     	}
-    } else {
+    } else if (range === "yearly") {
+    	let d = new Date(from);
+    	while (d <= now) {
+    		pushBucket(new Date(d), labelMonth(d));
+    		d = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+    	}
+    } else { // 30d, 90d, quarterly
     	for (let d = startOfWeek(from); d <= now; d.setDate(d.getDate() + 7)) {
     		const wk = new Date(d);
     		pushBucket(wk, labelWeek(wk));
@@ -151,6 +151,10 @@ export default function OrdersOverview() {
 
     const findBucketIndex = (dt: Date) => {
     	if (range === "7d") return buckets.findIndex((b) => b.key === labelDay(dt));
+    	if (range === "yearly") {
+    		const s = new Date(dt.getFullYear(), dt.getMonth(), 1).getTime();
+    		return buckets.findIndex((b) => b.start.getTime() === s);
+    	}
     	const s = startOfWeek(dt).getTime();
     	return buckets.findIndex((b) => b.start.getTime() === s);
     };
@@ -214,6 +218,8 @@ export default function OrdersOverview() {
 						<ToggleButton value="7d">7D</ToggleButton>
 						<ToggleButton value="30d">30D</ToggleButton>
 						<ToggleButton value="90d">90D</ToggleButton>
+						<ToggleButton value="quarterly">Quarterly</ToggleButton>
+						<ToggleButton value="yearly">Yearly</ToggleButton>
 					</ToggleButtonGroup>
 
 					<ToggleButtonGroup
@@ -228,7 +234,7 @@ export default function OrdersOverview() {
 				</Stack>
 			</Stack>
 
-			<Box sx={{ flex: 1, minHeight: 320 }}>
+			<Box sx={{ height: 320 }}>
 				{loading ? (
 					<Stack alignItems="center" justifyContent="center" sx={{ height: "100%" }}>
 						<CircularProgress size={28} />
@@ -257,8 +263,8 @@ export default function OrdersOverview() {
 								}
 							/>
 							<Legend />
-							{statuses.map((s) => (
-								<Bar key={s} dataKey={s} stackId="a" />
+							{statuses.map((s, i) => (
+								<Bar key={s} dataKey={s} stackId="a" fill={COLORS[i % COLORS.length]} />
 							))}
 						</BarChart>
 					</ResponsiveContainer>
