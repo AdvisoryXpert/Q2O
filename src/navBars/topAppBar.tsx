@@ -235,16 +235,21 @@ const TopAppBar: React.FC = () => {
 				</Drawer>
 			)}
 
-			{/* Main outlet – don't push with margin; pages are fixed and read the CSS var */}
+			{/* Main outlet – push with margin-left to avoid overlap with the drawer */}
 			<Box
 				component="main"
 				sx={{
-					// was: ml: `${drawerWidth}px`
-					// Let fixed pages use left: var(--app-drawer-width) instead.
 					p: 0,
 					minHeight: "100vh",
 					boxSizing: "border-box",
 					position: "relative",
+					ml: `var(--app-drawer-width)`,
+					width: `calc(100% - var(--app-drawer-width))`,
+					transition: (t) =>
+						t.transitions.create(["margin-left", "width"], {
+							easing: t.transitions.easing.sharp,
+							duration: t.transitions.duration.shortest,
+						}),
 				}}
 			>
 				<Outlet />

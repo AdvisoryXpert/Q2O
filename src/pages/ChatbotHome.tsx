@@ -15,8 +15,8 @@ import {
 import SearchIcon from "@mui/icons-material/Search";
 import NotificationsActiveIcon from "@mui/icons-material/NotificationsActive";
 import ReminderSection from "../components/reminders";
-import RecentQuotes from "../components/dashboard/RecentQuotes";
-import OrdersOverview from "../components/dashboard/OrdersOverview";
+import RecentQuotes from "../components/Dashboard/RecentQuotes";
+import OrdersOverview from "../components/Dashboard/OrdersOverview";
 import App from "../App";
 import { useNavigate } from "react-router-dom";
 
