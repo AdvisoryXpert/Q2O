@@ -1,3 +1,4 @@
+// src/pages/UserAdminPage.tsx
 import {
 	MaterialReactTable,
 	type MRT_ColumnDef,
@@ -15,6 +16,9 @@ import {
 	MenuItem,
 	FormControlLabel,
 	Checkbox,
+	Paper,
+	useTheme,
+	useMediaQuery,
 } from '@mui/material';
 import { useEffect, useState } from 'react';
 import RoleAccessSubview from './roleAccesssubview';
@@ -22,14 +26,14 @@ import { http } from '../lib/http';
 
 /** Types */
 type User = {
-	id: string | number;
-	full_name: string;
-	email: string;
-	phone: string;
-	role: string;
-	icon_labels: string[];
-	two_fa_enabled: boolean;
-	can_regenerate_2fa: boolean;
+  id: string | number;
+  full_name: string;
+  email: string;
+  phone: string;
+  role: string;
+  icon_labels: string[];
+  two_fa_enabled: boolean;
+  can_regenerate_2fa: boolean;
 };
 const availableRoles = ['Admin', 'Employee', 'Customer'];
 
@@ -107,15 +111,9 @@ const UserManagementTable = () => {
 
 	const handleIconToggle = (icon: string) => {
 		setSelectedIcons((prev) =>
-			prev.includes(icon)
-				? prev.filter((i) => i !== icon)
-				: [...prev, icon]
+			prev.includes(icon) ? prev.filter((i) => i !== icon) : [...prev, icon],
 		);
 	};
-
-	
-
-	
 
 	const handleSave = async () => {
 		const payload = {
@@ -145,34 +143,39 @@ const UserManagementTable = () => {
 			id: 'edit',
 			header: 'Actions',
 			Cell: ({ row }) => (
-				<Button variant="outlined" size="small" onClick={async () => {
-					setEditingUser(row.original);
-					setFullName(row.original.full_name);
-					setEmail(row.original.email);
-					setPhone(row.original.phone);
-					setSelectedRole(row.original.role);
-					setTwoFaEnabled(row.original.two_fa_enabled);
-					setCanRegenerate2FA(row.original.can_regenerate_2fa);
-					setIcons([]);
-					setSelectedIcons([]);
-					try {
-						const [iconsRes, accessRes] = await Promise.all([
-							http.get(`/userMgmt/role-icons?role=${row.original.role}`),
-							http.get(`/userMgmt/user-access?user_id=${row.original.id}`),
-						]);
-						const roleIcons = iconsRes.data;
-						const userAccessIcons = accessRes.data;
-						setIcons(roleIcons);
-						setTimeout(() => {
-							setSelectedIcons(userAccessIcons);
-						}, 0);
-					} catch (error) {
-						console.error('Error fetching icons during edit:', error);
+				<Button
+					variant="outlined"
+					size="small"
+					onClick={async () => {
+						setEditingUser(row.original);
+						setFullName(row.original.full_name);
+						setEmail(row.original.email);
+						setPhone(row.original.phone);
+						setSelectedRole(row.original.role);
+						setTwoFaEnabled(row.original.two_fa_enabled);
+						setCanRegenerate2FA(row.original.can_regenerate_2fa);
 						setIcons([]);
 						setSelectedIcons([]);
-					}
-					setOpenDialog(true);
-				}}>
+						try {
+							const [iconsRes, accessRes] = await Promise.all([
+								http.get(`/userMgmt/role-icons?role=${row.original.role}`),
+								http.get(`/userMgmt/user-access?user_id=${row.original.id}`),
+							]);
+							const roleIcons = iconsRes.data;
+							const userAccessIcons = accessRes.data;
+							setIcons(roleIcons);
+							// ensure checkboxes reflect fetched access after icons render
+							setTimeout(() => {
+								setSelectedIcons(userAccessIcons);
+							}, 0);
+						} catch (error) {
+							console.error('Error fetching icons during edit:', error);
+							setIcons([]);
+							setSelectedIcons([]);
+						}
+						setOpenDialog(true);
+					}}
+				>
 					Edit
 				</Button>
 			),
@@ -217,8 +220,8 @@ const UserManagementTable = () => {
 	];
 
 	return (
-		<>
-			<Typography variant="h5" sx={{ my: 2 }} textAlign="center">
+		<Paper elevation={3} sx={{ p: 3, mb: 3 }}>
+			<Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold' }}>
 				User Management
 			</Typography>
 
@@ -241,9 +244,14 @@ const UserManagementTable = () => {
 				state={{ isLoading, showAlertBanner: isError }}
 			/>
 
-			<Dialog open={openDialog} onClose={() => setOpenDialog(false)}>
+			<Dialog
+				open={openDialog}
+				onClose={() => setOpenDialog(false)}
+				fullWidth
+				maxWidth="sm"
+			>
 				<DialogTitle>{editingUser ? 'Edit User' : 'Create User'}</DialogTitle>
-				<DialogContent>
+				<DialogContent dividers>
 					<TextField
 						margin="dense"
 						label="Full Name"
@@ -270,13 +278,18 @@ const UserManagementTable = () => {
 						value={selectedRole}
 						onChange={handleRoleChange}
 						displayEmpty
-						style={{ marginTop: 16 }}
+						sx={{ mt: 2 }}
 					>
-						<MenuItem value="" disabled>Select Role</MenuItem>
+						<MenuItem value="" disabled>
+							Select Role
+						</MenuItem>
 						{availableRoles.map((role) => (
-							<MenuItem key={role} value={role}>{role}</MenuItem>
+							<MenuItem key={role} value={role}>
+								{role}
+							</MenuItem>
 						))}
 					</Select>
+
 					<Box sx={{ mt: 2 }}>
 						{icons.map((icon) => (
 							<FormControlLabel
@@ -292,6 +305,7 @@ const UserManagementTable = () => {
 							/>
 						))}
 					</Box>
+
 					<FormControlLabel
 						control={
 							<Checkbox
@@ -320,18 +334,44 @@ const UserManagementTable = () => {
 					</Button>
 				</DialogActions>
 			</Dialog>
-		</>
+		</Paper>
 	);
 };
 
 export default function UserManagementApp() {
+	const theme = useTheme();
+	const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
 	return (
-		<>
-			<Box>
-				<UserManagementTable />
-				<RoleAccessSubview />
+		<Paper
+			sx={{
+				position: 'fixed',
+				left: isMobile ? 0 : 'var(--app-drawer-width, 240px)',
+				top: 'var(--app-header-height, 56px)',
+				right: 0,
+				bottom: 0,
+				display: 'flex',
+				flexDirection: 'column',
+				borderRadius: 2,
+				boxShadow: 3,
+				overflow: 'hidden', // keeps chrome tidy
+			}}
+		>
+			{/* Scrollable content area */}
+			<Box sx={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto' }}>
+				<Box sx={{ px: { xs: 2, sm: 3, md: 4 }, py: 2 }}>
+					{/* Users */}
+					<UserManagementTable />
+
+					{/* Role access section */}
+					<Paper elevation={3} sx={{ p: 3 }}>
+						<Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>
+							Role Access
+						</Typography>
+						<RoleAccessSubview />
+					</Paper>
+				</Box>
 			</Box>
-		</>
+		</Paper>
 	);
 }

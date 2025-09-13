@@ -1,39 +1,48 @@
-import React, { useEffect, useState } from 'react';
+// src/pages/AnalyticsPage.tsx
+import React, { useEffect, useState, useMemo } from 'react';
 import { MaterialReactTable, type MRT_ColumnDef } from 'material-react-table';
-import { Box, Typography, TextField, Button } from '@mui/material';
+import {
+	Box,
+	Typography,
+	TextField,
+	Button,
+	Paper,
+	Divider,
+	useTheme,
+	useMediaQuery,
+} from '@mui/material';
 import { http } from '../lib/http';
 
 type LogEntry = {
-    id: number;
-    user_id: number;
-    timestamp: string;
-    ip_address: string;
-    device_info: string;
-    location: string;
-    page_accessed: string;
-    event_type: string;
-    session_id: string;
+  id: number;
+  user_id: number;
+  timestamp: string;
+  ip_address: string;
+  device_info: string;
+  location: string;
+  page_accessed: string;
+  event_type: string;
+  session_id: string;
 };
 
 type SummaryData = {
-    total_events: number;
-    unique_users: number;
-    unique_ips: number;
-    total_logins: number;
+  total_events: number;
+  unique_users: number;
+  unique_ips: number;
+  total_logins: number;
 };
 
-const AnalyticsPage: React.FC = () => {
-
+const AnalyticsContent: React.FC = () => {
 	const [logs, setLogs] = useState<LogEntry[]>([]);
 	const [summary, setSummary] = useState<SummaryData | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 
-	// Filter states
-	const [filterUserId, setFilterUserId] = useState<string>('');
-	const [filterEventType, setFilterEventType] = useState<string>('');
-	const [filterStartDate, setFilterStartDate] = useState<string>('');
-	const [filterEndDate, setFilterEndDate] = useState<string>('');
+	// Filters
+	const [filterUserId, setFilterUserId] = useState('');
+	const [filterEventType, setFilterEventType] = useState('');
+	const [filterStartDate, setFilterStartDate] = useState('');
+	const [filterEndDate, setFilterEndDate] = useState('');
 
 	const fetchAnalyticsData = async () => {
 		setLoading(true);
@@ -49,12 +58,11 @@ const AnalyticsPage: React.FC = () => {
 				http.get(`/analytics/logs?${params.toString()}`),
 				http.get('/analytics/summary'),
 			]);
-
 			setLogs(logsRes.data);
 			setSummary(summaryRes.data);
 		} catch (err: any) {
-			console.error("Failed to fetch analytics data:", err);
-			setError(err.message || "An unknown error occurred");
+			console.error('Failed to fetch analytics data:', err);
+			setError(err.message || 'An unknown error occurred');
 		} finally {
 			setLoading(false);
 		}
@@ -62,42 +70,55 @@ const AnalyticsPage: React.FC = () => {
 
 	useEffect(() => {
 		fetchAnalyticsData();
-	}, []); // Initial fetch
+	}, []); // initial
 
-	const handleFilterApply = () => {
-		fetchAnalyticsData();
-	};
+	const handleFilterApply = () => fetchAnalyticsData();
 
-	const columns: MRT_ColumnDef<LogEntry>[] = React.useMemo(
+	const columns: MRT_ColumnDef<LogEntry>[] = useMemo(
 		() => [
 			{ accessorKey: 'id', header: 'ID', size: 50 },
 			{ accessorKey: 'user_id', header: 'User ID', size: 80 },
 			{ accessorKey: 'timestamp', header: 'Timestamp', size: 150 },
 			{ accessorKey: 'ip_address', header: 'IP Address', size: 120 },
 			{ accessorKey: 'device_info', header: 'Device Info', size: 200 },
-			{ accessorKey: 'location', header: 'Location', size: 100 },
-			{ accessorKey: 'page_accessed', header: 'Page Accessed', size: 150 },
-			{ accessorKey: 'event_type', header: 'Event Type', size: 100 },
-			{ accessorKey: 'session_id', header: 'Session ID', size: 150 },
+			{ accessorKey: 'location', header: 'Location', size: 120 },
+			{ accessorKey: 'page_accessed', header: 'Page Accessed', size: 160 },
+			{ accessorKey: 'event_type', header: 'Event Type', size: 120 },
+			{ accessorKey: 'session_id', header: 'Session ID', size: 160 },
 		],
-		[],
+		[]
 	);
 
 	return (
-		<>
-			<Box sx={{ p: 3 }}>
-				<Typography variant="h4" gutterBottom>User Activity Analytics</Typography>
+		<Box sx={{ px: { xs: 2, sm: 3, md: 4 }, py: 2 }}>
+			{/* Title */}
+			<Typography variant="h5" gutterBottom sx={{ fontWeight: 700 }}>
+				User Activity Analytics
+			</Typography>
 
-				{summary && (
-					<Box sx={{ mb: 3, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-						<Typography variant="h6">Total Events: {summary.total_events}</Typography>
-						<Typography variant="h6">Unique Users: {summary.unique_users}</Typography>
-						<Typography variant="h6">Unique IPs: {summary.unique_ips}</Typography>
-						<Typography variant="h6">Total Logins: {summary.total_logins}</Typography>
+			{/* Summary block */}
+			<Paper elevation={3} sx={{ p: 3, mb: 3 }}>
+				<Typography variant="h6" sx={{ fontWeight: 700, mb: 1.5 }}>
+					Summary
+				</Typography>
+				{summary ? (
+					<Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+						<Box><Typography variant="body2" color="text.secondary">Total Events</Typography><Typography variant="h6">{summary.total_events}</Typography></Box>
+						<Box><Typography variant="body2" color="text.secondary">Unique Users</Typography><Typography variant="h6">{summary.unique_users}</Typography></Box>
+						<Box><Typography variant="body2" color="text.secondary">Unique IPs</Typography><Typography variant="h6">{summary.unique_ips}</Typography></Box>
+						<Box><Typography variant="body2" color="text.secondary">Total Logins</Typography><Typography variant="h6">{summary.total_logins}</Typography></Box>
 					</Box>
+				) : (
+					<Typography color="text.secondary">No summary yet.</Typography>
 				)}
+			</Paper>
 
-				<Box sx={{ mb: 3, display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+			{/* Filters block */}
+			<Paper elevation={3} sx={{ p: 3, mb: 3 }}>
+				<Typography variant="h6" sx={{ fontWeight: 700, mb: 1.5 }}>
+					Filters
+				</Typography>
+				<Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
 					<TextField
 						label="User ID"
 						value={filterUserId}
@@ -126,7 +147,19 @@ const AnalyticsPage: React.FC = () => {
 						InputLabelProps={{ shrink: true }}
 						size="small"
 					/>
-					<Button variant="contained" onClick={handleFilterApply}>Apply Filters</Button>
+					<Button variant="contained" onClick={handleFilterApply}>
+						Apply Filters
+					</Button>
+				</Box>
+			</Paper>
+
+			{/* Table block */}
+			<Paper elevation={3} sx={{ p: 3 }}>
+				<Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+					<Typography variant="h6" sx={{ fontWeight: 700, mr: 2 }}>
+						Logs
+					</Typography>
+					<Divider sx={{ flex: 1 }} />
 				</Box>
 
 				{loading ? (
@@ -144,9 +177,36 @@ const AnalyticsPage: React.FC = () => {
 						initialState={{ density: 'compact' }}
 					/>
 				)}
-			</Box>
-		</>
+			</Paper>
+		</Box>
 	);
 };
 
-export default AnalyticsPage;
+export default function AnalyticsPage() {
+	// Mirror the fixed container + scroll behavior from UserAdminPage
+	const theme = useTheme();
+	const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
+	return (
+		<Paper
+			sx={{
+				position: 'fixed',
+				left: isMobile ? 0 : 'var(--app-drawer-width, 240px)',
+				top: 'var(--app-header-height, 56px)',
+				right: 0,
+				bottom: 0,
+				display: 'flex',
+				flexDirection: 'column',
+				borderRadius: 2,
+				boxShadow: 3,
+				overflow: 'hidden',
+			}}
+			elevation={3}
+		>
+			{/* Scrollable content area to stack vertical blocks */}
+			<Box sx={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto' }}>
+				<AnalyticsContent />
+			</Box>
+		</Paper>
+	);
+}

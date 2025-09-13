@@ -1,3 +1,4 @@
+// src/pages/ConsolidatedAdmin.tsx
 import React, { useEffect, useState, useRef } from 'react';
 import {
 	MaterialReactTable,
@@ -5,7 +6,16 @@ import {
 	useMaterialReactTable,
 	MRT_Row,
 } from 'material-react-table';
-import { Box, Typography, IconButton, Button, Tooltip } from '@mui/material';
+import {
+	Box,
+	Typography,
+	IconButton,
+	Button,
+	Tooltip,
+	Paper,
+	useTheme,
+	useMediaQuery,
+} from '@mui/material';
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -36,6 +46,9 @@ type Attribute = {
 };
 
 const ConsolidatedAdmin = () => {
+	const theme = useTheme();
+	const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
 	const [conditions, setConditions] = useState<Condition[]>([]);
 	const [products, setProducts] = useState<Product[]>([]);
 	const [attributes, setAttributes] = useState<Attribute[]>([]);
@@ -60,7 +73,7 @@ const ConsolidatedAdmin = () => {
 			const res = await http.get('/conditions');
 			setConditions(res.data);
 		} catch (err) {
-			console.error("Failed to load conditions", err);
+			console.error('Failed to load conditions', err);
 		} finally {
 			setIsLoading(false);
 		}
@@ -74,8 +87,7 @@ const ConsolidatedAdmin = () => {
 			setAttributes([]);
 			setSelectedProductId(null);
 		} catch (err) {
-
-			console.error("Failed to load products", err);
+			console.error('Failed to load products', err);
 		} finally {
 			setIsLoading(false);
 		}
@@ -87,7 +99,7 @@ const ConsolidatedAdmin = () => {
 			const res = await http.get(`/product-attributes?product_id=${product_id}`);
 			setAttributes(res.data);
 		} catch (err) {
-			console.error("Failed to load attributes", err);
+			console.error('Failed to load attributes', err);
 		} finally {
 			setIsLoading(false);
 		}
@@ -100,7 +112,7 @@ const ConsolidatedAdmin = () => {
 				await fetchConditions();
 				setSelectedConditionId(null);
 			} catch (err) {
-				console.error("Failed to delete condition", err);
+				console.error('Failed to delete condition', err);
 			}
 		}
 	};
@@ -111,7 +123,7 @@ const ConsolidatedAdmin = () => {
 				await http.delete(`/products/${row.original.product_id}`);
 				if (selectedConditionId) await fetchProducts(selectedConditionId);
 			} catch (err) {
-				console.error("Failed to delete product", err);
+				console.error('Failed to delete product', err);
 			}
 		}
 	};
@@ -122,7 +134,7 @@ const ConsolidatedAdmin = () => {
 				await http.delete(`/product-attributes/${row.original.attribute_id}`);
 				if (selectedProductId) await fetchAttributes(selectedProductId);
 			} catch (err) {
-				console.error("Failed to delete attribute", err);
+				console.error('Failed to delete attribute', err);
 			}
 		}
 	};
@@ -138,7 +150,7 @@ const ConsolidatedAdmin = () => {
 				await http.post(`/product-attributes/${attribute_id}/upload-image`, formData);
 				if (selectedProductId) fetchAttributes(selectedProductId);
 			} catch (err) {
-				console.error("Failed to upload image", err);
+				console.error('Failed to upload image', err);
 			}
 		}
 	};
@@ -154,7 +166,7 @@ const ConsolidatedAdmin = () => {
 				await http.post(`/product-attributes/${attribute_id}/upload-specification`, formData);
 				if (selectedProductId) fetchAttributes(selectedProductId);
 			} catch (err) {
-				console.error("Failed to upload specification", err);
+				console.error('Failed to upload specification', err);
 			}
 		}
 	};
@@ -190,8 +202,8 @@ const ConsolidatedAdmin = () => {
 						<DeleteIcon />
 					</IconButton>
 				</Tooltip>
-			)
-		}
+			),
+		},
 	];
 
 	const attrColumns: MRT_ColumnDef<Attribute>[] = [
@@ -202,10 +214,13 @@ const ConsolidatedAdmin = () => {
 			header: 'Image',
 			Cell: ({ row }) => (
 				<>
-					<input type="file" ref={(el) => (fileInputRefs.current[row.original.attribute_id] = el)} />
+					<input
+						type="file"
+						ref={(el) => (fileInputRefs.current[row.original.attribute_id] = el)}
+					/>
 					<Button onClick={() => handleImageUpload(row.original.attribute_id)}>Upload</Button>
 				</>
-			)
+			),
 		},
 		{
 			header: 'Uploaded Image',
@@ -217,16 +232,21 @@ const ConsolidatedAdmin = () => {
 						</a>
 					)}
 				</>
-			)
+			),
 		},
 		{
 			header: 'Product Specification',
 			Cell: ({ row }) => (
 				<>
-					<input type="file" ref={(el) => (fileInputRefs.current[row.original.attribute_id] = el)} />
-					<Button onClick={() => handleSpecificationUpload(row.original.attribute_id)}>Upload</Button>
+					<input
+						type="file"
+						ref={(el) => (fileInputRefs.current[row.original.attribute_id] = el)}
+					/>
+					<Button onClick={() => handleSpecificationUpload(row.original.attribute_id)}>
+						Upload
+					</Button>
 				</>
-			)
+			),
 		},
 		{
 			header: 'View Specification',
@@ -238,7 +258,7 @@ const ConsolidatedAdmin = () => {
 						</a>
 					)}
 				</>
-			)
+			),
 		},
 		{
 			header: 'WhatsApp',
@@ -247,26 +267,26 @@ const ConsolidatedAdmin = () => {
 					<IconButton
 						color="success"
 						onClick={() => {
-							const phone = prompt("Enter phone number");
+							const phone = prompt('Enter phone number');
 							if (phone) {
-								const product = products.find(p => p.product_id === row.original.product_id);
-								const c = conditions.find(c => c.condition_id === product?.condition_id);
+								const product = products.find((p) => p.product_id === row.original.product_id);
+								const c = conditions.find((c) => c.condition_id === product?.condition_id);
 
 								const text = `Product: ${product?.name}
-								\nTDS: ${c?.tds_min}-${c?.tds_max}
-								\nHardness: ${c?.hardness_min}-${c?.hardness_max}`;
-								const imageUrl = row.original.image_url ? 
-									`\nImage: ${row.original.image_url}` : '';
-								const url = `https://web.whatsapp.com/send?phone=${phone}&text=
-								${encodeURIComponent(text + imageUrl)}`;
-								window.open(url, "_blank");
+\nTDS: ${c?.tds_min}-${c?.tds_max}
+\nHardness: ${c?.hardness_min}-${c?.hardness_max}`;
+								const imageUrl = row.original.image_url ? `\nImage: ${row.original.image_url}` : '';
+								const url = `https://web.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(
+									text + imageUrl,
+								)}`;
+								window.open(url, '_blank');
 							}
 						}}
 					>
 						<WhatsAppIcon />
 					</IconButton>
 				</Tooltip>
-			)
+			),
 		},
 		{
 			id: 'actions',
@@ -279,7 +299,6 @@ const ConsolidatedAdmin = () => {
 				</Tooltip>
 			),
 		},
-		
 	];
 
 	const conditionTable = useMaterialReactTable({
@@ -292,7 +311,7 @@ const ConsolidatedAdmin = () => {
 			const newSelection = typeof updater === 'function' ? updater({}) : updater;
 			const selectedKey = Object.keys(newSelection)[0];
 			const selectedId = selectedKey ? Number(selectedKey) : null;
-      
+
 			setSelectedConditionId(selectedId);
 			if (!selectedId) {
 				setProducts([]);
@@ -308,11 +327,7 @@ const ConsolidatedAdmin = () => {
 		editDisplayMode: 'modal',
 		enableEditing: true,
 		renderTopToolbarCustomActions: ({ table }) => (
-			<Button
-				variant="contained"
-				startIcon={<AddIcon />}
-				onClick={() => table.setCreatingRow(true)}
-			>
+			<Button variant="contained" startIcon={<AddIcon />} onClick={() => table.setCreatingRow(true)}>
 				Create New Condition
 			</Button>
 		),
@@ -322,16 +337,16 @@ const ConsolidatedAdmin = () => {
 				await fetchConditions();
 				table.setCreatingRow(null);
 			} catch (err) {
-				console.error("Failed to create condition", err);
+				console.error('Failed to create condition', err);
 			}
 		},
-		onEditingRowSave: async ({ values,table }) => {
+		onEditingRowSave: async ({ values, table }) => {
 			try {
 				await http.put(`/conditions/${values.condition_id}`, values);
 				await fetchConditions();
 				table.setEditingRow(null);
 			} catch (err) {
-				console.error("Failed to update condition", err);
+				console.error('Failed to update condition', err);
 			}
 		},
 		state: {
@@ -340,7 +355,8 @@ const ConsolidatedAdmin = () => {
 		},
 		muiTableBodyRowProps: ({ row }) => ({
 			sx: {
-				backgroundColor: row.id === String(selectedConditionId) ? 'rgba(0, 0, 255, 0.1)' : undefined,
+				backgroundColor:
+          row.id === String(selectedConditionId) ? 'rgba(0, 0, 255, 0.1)' : undefined,
 				'&:hover': {
 					backgroundColor: 'rgba(0, 0, 0, 0.05)',
 				},
@@ -358,7 +374,7 @@ const ConsolidatedAdmin = () => {
 			const newSelection = typeof updater === 'function' ? updater({}) : updater;
 			const selectedKey = Object.keys(newSelection)[0];
 			const selectedId = selectedKey ? Number(selectedKey) : null;
-      
+
 			setSelectedProductId(selectedId);
 			if (selectedId) {
 				fetchAttributes(selectedId);
@@ -391,16 +407,16 @@ const ConsolidatedAdmin = () => {
 				await fetchProducts(selectedConditionId);
 				table.setCreatingRow(null);
 			} catch (err) {
-				console.error("Failed to create product", err);
+				console.error('Failed to create product', err);
 			}
 		},
-		onEditingRowSave: async ({ values,table }) => {
+		onEditingRowSave: async ({ values, table }) => {
 			try {
 				await http.put(`/products/${values.product_id}`, values);
 				if (selectedConditionId) await fetchProducts(selectedConditionId);
 				table.setEditingRow(null);
 			} catch (err) {
-				console.error("Failed to update product", err);
+				console.error('Failed to update product', err);
 			}
 		},
 		state: {
@@ -409,7 +425,8 @@ const ConsolidatedAdmin = () => {
 		},
 		muiTableBodyRowProps: ({ row }) => ({
 			sx: {
-				backgroundColor: row.id === String(selectedProductId) ? 'rgba(0, 0, 255, 0.1)' : undefined,
+				backgroundColor:
+          row.id === String(selectedProductId) ? 'rgba(0, 0, 255, 0.1)' : undefined,
 				'&:hover': {
 					backgroundColor: 'rgba(0, 0, 0, 0.05)',
 				},
@@ -445,16 +462,16 @@ const ConsolidatedAdmin = () => {
 				await fetchAttributes(selectedProductId);
 				table.setCreatingRow(null);
 			} catch (err) {
-				console.error("Failed to create attribute", err);
+				console.error('Failed to create attribute', err);
 			}
 		},
-		onEditingRowSave: async ({ values,table }) => {
+		onEditingRowSave: async ({ values, table }) => {
 			try {
 				await http.put(`/product-attributes/${values.attribute_id}`, values);
 				if (selectedProductId) await fetchAttributes(selectedProductId);
 				table.setEditingRow(null);
 			} catch (err) {
-				console.error("Failed to update attribute", err);
+				console.error('Failed to update attribute', err);
 			}
 		},
 		state: {
@@ -463,32 +480,53 @@ const ConsolidatedAdmin = () => {
 	});
 
 	return (
-		<>
-			<Box sx={{ p: 2 }}>
-				<Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold' }}>
-					Water Conditions
-				</Typography>
-				<MaterialReactTable table={conditionTable} />
-
-				{selectedConditionId && (
-					<>
-						<Typography variant="h5" mt={4} gutterBottom sx={{ fontWeight: 'bold' }}>
-							Products
+		<Paper
+			sx={{
+				position: 'fixed',
+				left: isMobile ? 0 : 'var(--app-drawer-width, 240px)',
+				top: 'var(--app-header-height, 56px)',
+				right: 0,
+				bottom: 0,
+				display: 'flex',
+				flexDirection: 'column',
+				borderRadius: 2,
+				boxShadow: 3,
+				overflow: 'hidden', // keep the chrome clean
+			}}
+		>
+			{/* Scrollable content area */}
+			<Box sx={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto' }}>
+				<Box sx={{ px: { xs: 2, sm: 3, md: 4 }, py: 2 }}>
+					{/* Conditions */}
+					<Paper elevation={3} sx={{ p: 3, mb: 2, background: theme.palette.background.paper }}>
+						<Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+							Water Conditions
 						</Typography>
-						<MaterialReactTable table={productTable} />
-					</>
-				)}
+						<MaterialReactTable table={conditionTable} />
+					</Paper>
 
-				{selectedProductId && (
-					<>
-						<Typography variant="h5" mt={4} gutterBottom sx={{ fontWeight: 'bold' }}>
-							Product Attributes
-						</Typography>
-						<MaterialReactTable table={attrTable} />
-					</>
-				)}
+					{/* Products (only when a condition is selected) */}
+					{selectedConditionId && (
+						<Paper elevation={3} sx={{ p: 3, mb: 2, background: theme.palette.background.paper }}>
+							<Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+								Products
+							</Typography>
+							<MaterialReactTable table={productTable} />
+						</Paper>
+					)}
+
+					{/* Attributes (only when a product is selected) */}
+					{selectedProductId && (
+						<Paper elevation={3} sx={{ p: 3, mb: 2, background: theme.palette.background.paper }}>
+							<Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+								Product Attributes
+							</Typography>
+							<MaterialReactTable table={attrTable} />
+						</Paper>
+					)}
+				</Box>
 			</Box>
-		</>
+		</Paper>
 	);
 };
 

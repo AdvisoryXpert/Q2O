@@ -1,13 +1,14 @@
+// src/pages/PricingAdmin.tsx
 import React, { useEffect, useState, useMemo } from 'react';
 import {
 	MaterialReactTable,
 	type MRT_ColumnDef,
 	useMaterialReactTable,
 } from 'material-react-table';
-import { 
-	Box, 
-	Button, 
-	TextField, 
+import {
+	Box,
+	Button,
+	TextField,
 	Typography,
 	IconButton,
 	Tooltip,
@@ -16,13 +17,14 @@ import {
 	CircularProgress,
 	Select,
 	MenuItem,
+	useMediaQuery, // 👈 added
 } from '@mui/material';
-import { 
+import {
 	Add as AddIcon,
 	Delete as DeleteIcon,
 	Edit as EditIcon,
 	Save as SaveIcon,
-	Cancel as CancelIcon
+	Cancel as CancelIcon,
 } from '@mui/icons-material';
 import { http } from '../lib/http';
 import AddPricingModal from './AddPricingModal';
@@ -34,7 +36,7 @@ type Pricing = {
   min_quantity: number;
   cost_price: number;
   price: number;
-  attribute_name: string; 
+  attribute_name: string;
   product_name?: string;
   condition_id?: number;
 };
@@ -50,6 +52,8 @@ type AccountType = {
 
 const PricingAdmin = () => {
 	const theme = useTheme();
+	const isMobile = useMediaQuery(theme.breakpoints.down('sm')); // 👈 added
+
 	const [pricingData, setPricingData] = useState<Pricing[]>([]);
 	const [accountTypes, setAccountTypes] = useState<AccountType[]>([]);
 	const [isLoading, setIsLoading] = useState(false);
@@ -113,12 +117,16 @@ const PricingAdmin = () => {
 		if (!validateRequired(accountType.category)) {
 			errors.category = 'Category is required';
 		}
-		if (!validateRequired(accountType.min_margin_percent) || 
-			!validatePositiveNumber(accountType.min_margin_percent)) {
+		if (
+			!validateRequired(accountType.min_margin_percent) ||
+      !validatePositiveNumber(accountType.min_margin_percent)
+		) {
 			errors.min_margin_percent = 'Minimum margin must be a positive number';
 		}
-		if (!validateRequired(accountType.max_margin_percent) || 
-			!validatePositiveNumber(accountType.max_margin_percent)) {
+		if (
+			!validateRequired(accountType.max_margin_percent) ||
+      !validatePositiveNumber(accountType.max_margin_percent)
+		) {
 			errors.max_margin_percent = 'Maximum margin must be a positive number';
 		}
 		return errors;
@@ -133,7 +141,7 @@ const PricingAdmin = () => {
 		try {
 			setIsLoading(true);
 			await http.post('/product-pricing', values);
-      
+
 			await fetchPricing();
 			table.setCreatingRow(null);
 			setValidationErrors({});
@@ -186,7 +194,7 @@ const PricingAdmin = () => {
 		try {
 			setIsLoading(true);
 			await http.post('/account-types', values);
-      
+
 			await fetchAccountTypes();
 			table.setCreatingRow(null);
 			setValidationErrors({});
@@ -232,7 +240,6 @@ const PricingAdmin = () => {
 	};
 
 	const pricingColumns: MRT_ColumnDef<Pricing>[] = [
-		
 		{
 			accessorKey: 'condition_id',
 			header: 'Condition',
@@ -240,9 +247,7 @@ const PricingAdmin = () => {
 			Cell: ({ row }) => (
 				<Typography variant="body2">{row.original.condition_id ?? ''}</Typography>
 			),
-			Edit: ({ cell }) => (
-				<TextField size="small" value={cell.getValue() || ''} disabled fullWidth />
-			),
+			Edit: ({ cell }) => <TextField size="small" value={cell.getValue() || ''} disabled fullWidth />,
 		},
 		{
 			accessorKey: 'product_name',
@@ -251,24 +256,15 @@ const PricingAdmin = () => {
 			Cell: ({ row }) => (
 				<Typography variant="body2">{row.original.product_name ?? ''}</Typography>
 			),
-			Edit: ({ cell }) => (
-				<TextField size="small" value={cell.getValue() || ''} disabled fullWidth />
-			),
+			Edit: ({ cell }) => <TextField size="small" value={cell.getValue() || ''} disabled fullWidth />,
 		},
-		
+
 		{
 			accessorKey: 'attribute_name',
 			header: 'Attribute',
 			size: 250,
 			Cell: ({ row }) => <Typography variant="body2">{row.original.attribute_name}</Typography>,
-			Edit: ({ cell }) => (
-				<TextField
-					size="small"
-					value={cell.getValue() || ''}
-					disabled
-					fullWidth
-				/>
-			),
+			Edit: ({ cell }) => <TextField size="small" value={cell.getValue() || ''} disabled fullWidth />,
 		},
 		{
 			accessorKey: 'min_quantity',
@@ -279,9 +275,7 @@ const PricingAdmin = () => {
 					size="small"
 					type="number"
 					value={cell.getValue() || ''}
-					onChange={(e) =>
-						table.options.meta?.updateData(row.index, 'min_quantity', Number(e.target.value))
-					}
+					onChange={(e) => table.options.meta?.updateData(row.index, 'min_quantity', Number(e.target.value))}
 					fullWidth
 					error={!!validationErrors.min_quantity}
 					helperText={validationErrors.min_quantity}
@@ -297,9 +291,7 @@ const PricingAdmin = () => {
 					size="small"
 					type="number"
 					value={cell.getValue() || ''}
-					onChange={(e) =>
-						table.options.meta?.updateData(row.index, 'cost_price', Number(e.target.value))
-					}
+					onChange={(e) => table.options.meta?.updateData(row.index, 'cost_price', Number(e.target.value))}
 					fullWidth
 					error={!!validationErrors.cost_price}
 					helperText={validationErrors.cost_price}
@@ -315,9 +307,7 @@ const PricingAdmin = () => {
 					size="small"
 					type="number"
 					value={cell.getValue() || ''}
-					onChange={(e) =>
-						table.options.meta?.updateData(row.index, 'price', Number(e.target.value))
-					}
+					onChange={(e) => table.options.meta?.updateData(row.index, 'price', Number(e.target.value))}
 					fullWidth
 					error={!!validationErrors.price}
 					helperText={validationErrors.price}
@@ -346,8 +336,12 @@ const PricingAdmin = () => {
 					) : (
 						<>
 							<Tooltip title="Edit">
-								<IconButton onClick={() => { setCurrentPricing(row.original); 
-									setEditPricingModalOpen(true); }}>
+								<IconButton
+									onClick={() => {
+										setCurrentPricing(row.original);
+										setEditPricingModalOpen(true);
+									}}
+								>
 									<EditIcon color="primary" />
 								</IconButton>
 							</Tooltip>
@@ -363,114 +357,117 @@ const PricingAdmin = () => {
 		},
 	];
 
-	const accountTypeColumns = useMemo<MRT_ColumnDef<AccountType>[]>(() => [
-		{
-			accessorKey: 'account_type_name',
-			header: 'Account Type Name',
-			size: 200,
-			Edit: ({ cell, row, table }) => {
-				const [value, setValue] = useState(cell.getValue() || '');
-				return (
-					<TextField
-						size="small"
-						value={value}
+	const accountTypeColumns = useMemo<MRT_ColumnDef<AccountType>[]>(
+		() => [
+			{
+				accessorKey: 'account_type_name',
+				header: 'Account Type Name',
+				size: 200,
+				Edit: ({ cell, row, table }) => {
+					const [value, setValue] = useState(cell.getValue() || '');
+					return (
+						<TextField
+							size="small"
+							value={value}
+							onChange={(e) => {
+								setValue(e.target.value);
+								table.options.meta?.updateData(row.index, 'account_type_name', e.target.value);
+							}}
+							fullWidth
+							error={!!validationErrors.account_type_name}
+							helperText={validationErrors.account_type_name}
+						/>
+					);
+				},
+			},
+			{
+				accessorKey: 'category',
+				header: 'Category',
+				size: 150,
+				Edit: ({ row, table }) => (
+					<Select
+						value={accountTypes[row.index]?.category || ''}
 						onChange={(e) => {
-							setValue(e.target.value);
-							table.options.meta?.updateData(row.index, 'account_type_name', e.target.value);
+							const newValue = e.target.value;
+							table.options.meta?.updateData(row.index, 'category', newValue);
 						}}
 						fullWidth
-						error={!!validationErrors.account_type_name}
-						helperText={validationErrors.account_type_name}
-					/>
-				);
+					>
+						<MenuItem value="Dealer">Dealer</MenuItem>
+						<MenuItem value="Individual">Individual</MenuItem>
+					</Select>
+				),
 			},
-		},
-		{
-			accessorKey: 'category',
-			header: 'Category',
-			size: 150,
-			Edit: ({ row, table }) => (
-				<Select
-					value={accountTypes[row.index]?.category || ''}
-					onChange={(e) => {
-						const newValue = e.target.value;
-						table.options.meta?.updateData(row.index, 'category', newValue);
-					}}
-					fullWidth
-				>
-					<MenuItem value="Dealer">Dealer</MenuItem>
-					<MenuItem value="Individual">Individual</MenuItem>
-				</Select>
-			),
-		},
-		{
-			accessorKey: 'min_margin_percent',
-			header: 'Min Margin (%)',
-			size: 150,
-			Cell: ({ cell }) => `${cell.getValue()}%`,
-			Edit: ({ cell, row, table }) => {
-				const [value, setValue] = useState(cell.getValue() || '');
-				return (
-					<TextField
-						size="small"
-						type="number"
-						value={value}
-						onChange={(e) => {
-							setValue(e.target.value);
-							table.options.meta?.updateData(row.index, 'min_margin_percent', Number(e.target.value));
-						}}
-						fullWidth
-						error={!!validationErrors.min_margin_percent}
-						helperText={validationErrors.min_margin_percent}
-					/>
-				);
+			{
+				accessorKey: 'min_margin_percent',
+				header: 'Min Margin (%)',
+				size: 150,
+				Cell: ({ cell }) => `${cell.getValue()}%`,
+				Edit: ({ cell, row, table }) => {
+					const [value, setValue] = useState(cell.getValue() || '');
+					return (
+						<TextField
+							size="small"
+							type="number"
+							value={value}
+							onChange={(e) => {
+								setValue(e.target.value);
+								table.options.meta?.updateData(row.index, 'min_margin_percent', Number(e.target.value));
+							}}
+							fullWidth
+							error={!!validationErrors.min_margin_percent}
+							helperText={validationErrors.min_margin_percent}
+						/>
+					);
+				},
 			},
-		},
-		{
-			accessorKey: 'max_margin_percent',
-			header: 'Max Margin (%)',
-			size: 150,
-			Cell: ({ cell }) => `${cell.getValue()}%`,
-			Edit: ({ cell, row, table }) => {
-				const [value, setValue] = useState(cell.getValue() || '');
-				return (
-					<TextField
-						size="small"
-						type="number"
-						value={value}
-						onChange={(e) => {
-							setValue(e.target.value);
-							table.options.meta?.updateData(row.index, 'max_margin_percent', Number(e.target.value));
-						}}
-						fullWidth
-						error={!!validationErrors.max_margin_percent}
-						helperText={validationErrors.max_margin_percent}
-					/>
-				);
+			{
+				accessorKey: 'max_margin_percent',
+				header: 'Max Margin (%)',
+				size: 150,
+				Cell: ({ cell }) => `${cell.getValue()}%`,
+				Edit: ({ cell, row, table }) => {
+					const [value, setValue] = useState(cell.getValue() || '');
+					return (
+						<TextField
+							size="small"
+							type="number"
+							value={value}
+							onChange={(e) => {
+								setValue(e.target.value);
+								table.options.meta?.updateData(row.index, 'max_margin_percent', Number(e.target.value));
+							}}
+							fullWidth
+							error={!!validationErrors.max_margin_percent}
+							helperText={validationErrors.max_margin_percent}
+						/>
+					);
+				},
 			},
-		},
-		{
-			accessorKey: 'description',
-			header: 'Description',
-			size: 300,
-			Edit: ({ cell, row, table }) => {
-				const [value, setValue] = useState(cell.getValue() || '');
-				return (
-					<TextField
-						size="small"
-						multiline
-						rows={3}
-						value={value}
-						onChange={(e) => {
-							setValue(e.target.value);
-							table.options.meta?.updateData(row.index, 'description', e.target.value);
-						}}
-						fullWidth
-					/>
-				);
+			{
+				accessorKey: 'description',
+				header: 'Description',
+				size: 300,
+				Edit: ({ cell, row, table }) => {
+					const [value, setValue] = useState(cell.getValue() || '');
+					return (
+						<TextField
+							size="small"
+							multiline
+							rows={3}
+							value={value}
+							onChange={(e) => {
+								setValue(e.target.value);
+								table.options.meta?.updateData(row.index, 'description', e.target.value);
+							}}
+							fullWidth
+						/>
+					);
+				},
 			},
-		},
-	], [validationErrors, accountTypes]);
+		],
+		[validationErrors, accountTypes],
+	);
 
 	const pricingTable = useMaterialReactTable({
 		columns: pricingColumns,
@@ -479,10 +476,10 @@ const PricingAdmin = () => {
 		createDisplayMode: 'modal',
 		editDisplayMode: 'modal',
 		enableColumnResizing: true,
-		enableGrouping: true,  // ✅ Turn on row grouping
+		enableGrouping: true, // ✅ Turn on row grouping
 		autoResetPageIndex: false,
-		 initialState: {
-			grouping: ['condition_id','product_name'],
+		initialState: {
+			grouping: ['condition_id', 'product_name'],
 			expanded: true,
 		},
 		layoutMode: 'grid',
@@ -519,9 +516,7 @@ const PricingAdmin = () => {
 		meta: {
 			updateData: (rowIndex, columnId, value) => {
 				setPricingData((prev) =>
-					prev.map((row, index) =>
-						index === rowIndex ? { ...row, [columnId]: value } : row
-					)
+					prev.map((row, index) => (index === rowIndex ? { ...row, [columnId]: value } : row)),
 				);
 			},
 			saveRow: (row) => {
@@ -545,6 +540,7 @@ const PricingAdmin = () => {
 		onCreatingRowSave: handleCreateAccountType,
 		onEditingRowSave: handleUpdateAccountType,
 		onEditingRowCancel: () => setValidationErrors({}),
+		muiTableContainerProps: { sx: { maxHeight: '60vh', overflow: 'auto' } },
 		renderRowActions: ({ row, table }) => (
 			<Box sx={{ display: 'flex', gap: '1rem' }}>
 				<Tooltip title="Edit">
@@ -589,76 +585,93 @@ const PricingAdmin = () => {
 		meta: {
 			updateData: (rowIndex, columnId, value) => {
 				setAccountTypes((prev) =>
-					prev.map((row, index) =>
-						index === rowIndex ? { ...row, [columnId]: value } : row
-					)
+					prev.map((row, index) => (index === rowIndex ? { ...row, [columnId]: value } : row)),
 				);
 			},
 		},
 	});
 
 	return (
-		<>
-			<Box sx={{ px: { xs: 2, sm: 3, md: 4 } }}>
-				<Paper elevation={3} sx={{ p: 3, mb: 3, background: theme.palette.background.paper }}>
-					<Typography variant="h5" 
-						gutterBottom sx={{ fontWeight: 'bold', color: theme.palette.primary.main }}>
-						Account Type Management
-					</Typography>
-					<Typography variant="body1" color="text.secondary">
-						Manage account types for dealers and individuals
-					</Typography>
-				</Paper>
-				<MaterialReactTable table={accountTypeTable} />
-				<Box sx={{ mt: 4 }}>
+		<Paper
+			// 👇 fixed canvas that matches other pages; inner area scrolls vertically
+			sx={{
+				position: 'fixed',
+				left: isMobile ? 0 : 'var(--app-drawer-width, 240px)',
+				top: 'var(--app-header-height, 56px)',
+				right: 0,
+				bottom: 0,
+				display: 'flex',
+				flexDirection: 'column',
+				borderRadius: 2,
+				boxShadow: 3,
+				overflow: 'hidden',
+			}}
+		>
+			<Box sx={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto' }}>
+				<Box sx={{ px: { xs: 2, sm: 3, md: 4 }, py: 2 }}>
 					<Paper elevation={3} sx={{ p: 3, mb: 3, background: theme.palette.background.paper }}>
-						<Typography variant="h5" gutterBottom sx=
-							{{ fontWeight: 'bold', color: theme.palette.primary.main }}>
-							Product Pricing Management
+						<Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', color: theme.palette.primary.main }}>
+							Account Type Management
 						</Typography>
 						<Typography variant="body1" color="text.secondary">
-							Manage pricing rules for product attributes
+							Manage account types for dealers and individuals
 						</Typography>
 					</Paper>
-					<MaterialReactTable table={pricingTable} />
-				</Box>
-				<AddPricingModal
-					open={addPricingModalOpen}
-					onClose={() => {
-						setAddPricingModalOpen(false);
-						setModalError(null); // Clear error when closing modal
-					}}
-					onSave={async (pricing) => {
-						try {
-							await http.post('/product-pricing', pricing);
-              
-							await fetchPricing();
+
+					<MaterialReactTable table={accountTypeTable} />
+
+					<Box sx={{ mt: 4 }}>
+						<Paper elevation={3} sx={{ p: 3, mb: 3, background: theme.palette.background.paper }}>
+							<Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', color: theme.palette.primary.main }}>
+								Product Pricing Management
+							</Typography>
+							<Typography variant="body1" color="text.secondary">
+								Manage pricing rules for product attributes
+							</Typography>
+						</Paper>
+
+						<MaterialReactTable table={pricingTable} />
+					</Box>
+
+					<AddPricingModal
+						open={addPricingModalOpen}
+						onClose={() => {
 							setAddPricingModalOpen(false);
-							setModalError(null); // Clear error on success
-						} catch (err) {
-							const errorMessage = err instanceof Error ? err.message : String(err);
-							setModalError(
-								errorMessage.includes('already exists')
-									? 'This product/attribute combination exists'
-									: 'Failed to save pricing: ' + errorMessage
-							);
-						}
-					}}
-					error={modalError} // Pass error to modal
-					clearError={() => setModalError(null)} // Pass error clearing function
-				/>
-				<EditPricingModal
-					open={editPricingModalOpen}
-					pricingData={currentPricing}
-					onClose={() => setEditPricingModalOpen(false)}
-					onSave={async (updatedPricing) => {
-						await http.put(`/product-pricing/${updatedPricing.pricing_id}`, updatedPricing);
-						await fetchPricing();
-						setEditPricingModalOpen(false);
-					}}
-				/>
+							setModalError(null); // Clear error when closing modal
+						}}
+						onSave={async (pricing) => {
+							try {
+								await http.post('/product-pricing', pricing);
+
+								await fetchPricing();
+								setAddPricingModalOpen(false);
+								setModalError(null); // Clear error on success
+							} catch (err) {
+								const errorMessage = err instanceof Error ? err.message : String(err);
+								setModalError(
+									errorMessage.includes('already exists')
+										? 'This product/attribute combination exists'
+										: 'Failed to save pricing: ' + errorMessage,
+								);
+							}
+						}}
+						error={modalError} // Pass error to modal
+						clearError={() => setModalError(null)} // Pass error clearing function
+					/>
+
+					<EditPricingModal
+						open={editPricingModalOpen}
+						pricingData={currentPricing}
+						onClose={() => setEditPricingModalOpen(false)}
+						onSave={async (updatedPricing) => {
+							await http.put(`/product-pricing/${updatedPricing.pricing_id}`, updatedPricing);
+							await fetchPricing();
+							setEditPricingModalOpen(false);
+						}}
+					/>
+				</Box>
 			</Box>
-		</>
+		</Paper>
 	);
 };
 
