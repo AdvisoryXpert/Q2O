@@ -30,7 +30,7 @@ type QuotationItem = {
   product_name: string;
   attribute_name: string;
   product_attribute_id?: number;
-  quantity: number;
+  quantity: number | '';
   unit_price: number;
   total_price: number;
   is_selected: boolean;
@@ -151,6 +151,7 @@ const QuotationItems = () => {
 					...item,
 					system_price: item.unit_price,
 				}));
+				itemsWithSystemPrice.sort((a, b) => a.product_id - b.product_id);
 				setItems(itemsWithSystemPrice);
 
 				// ✅ Step 3: Set row selection from is_selected
@@ -214,8 +215,34 @@ const QuotationItems = () => {
 						? item.system_price || item.unit_price
 						: newPrice,
 					total_price: isNaN(newPrice)
-						? (item.system_price || item.unit_price) * item.quantity
-						: newPrice * item.quantity,
+						? (item.system_price || item.unit_price) * Number(item.quantity)
+						: newPrice * Number(item.quantity),
+				};
+			})
+		);
+	};
+
+	const handleQuantityChange = (quoteItemId: number, newQuantity: number) => {
+		setItems(prevItems =>
+			prevItems.map(item => {
+				if (item.quote_item_id !== quoteItemId) return item;
+
+				const unitPrice = item.is_manual_override && item.manual_price ? item.manual_price : item.system_price;
+
+				if (isNaN(newQuantity)) {
+					return {
+						...item,
+						quantity: '',
+						total_price: 0,
+					};
+				}
+
+				const quantity = newQuantity < 1 ? 1 : newQuantity;
+
+				return {
+					...item,
+					quantity: quantity,
+					total_price: (unitPrice || 0) * quantity,
 				};
 			})
 		);
@@ -275,7 +302,7 @@ const QuotationItems = () => {
 					min_margin_percent: pricing.marginPercent,
 					system_price: pricing.unitPrice,
 					unit_price: newUnit,
-					total_price: newUnit * item.quantity,
+					total_price: newUnit * Number(item.quantity),
 				};
 			})
 		);
@@ -316,7 +343,7 @@ const QuotationItems = () => {
 					is_manual_override:   enable,
 					manual_price:         enable ? marginalPrice : undefined,
 					unit_price:           enable ? marginalPrice : sys,
-					total_price:          (enable ? marginalPrice : sys) * it.quantity,
+					total_price:          (enable ? marginalPrice : sys) * Number(it.quantity),
 				};
 			})
 		);
@@ -382,7 +409,7 @@ const QuotationItems = () => {
 					item.product_id,
 					item.product_name,
 					item.attribute_name,
-					item.quantity,
+					Number(item.quantity),
 					`₹${item.unit_price.toFixed(2)}`,
 					`₹${item.total_price.toFixed(2)}`,
 				]
@@ -578,6 +605,25 @@ const QuotationItems = () => {
 			{
 				accessorKey: "quantity",
 				header: "Quantity",
+				Cell: ({ row }) => {
+					const item = row.original;
+					const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+						const value = e.target.value;
+						const newQuantity = parseInt(value.replace(/[^0-9]/g, ''), 10);
+						handleQuantityChange(item.quote_item_id, newQuantity);
+					};
+
+					return (
+						<TextField
+							size="small"
+							type="text"
+							value={item.quantity}
+							onChange={handleChange}
+							inputProps={{ min: 1 }}
+							sx={{ width: '80px' }}
+						/>
+					);
+				},
 			},
 			{
 				accessorKey: "price_control",
@@ -669,11 +715,11 @@ const QuotationItems = () => {
 				header: "Unit Price",
 				Cell: ({ cell }) => `₹${cell.getValue<number>().toFixed(2)}`,
 			},
-			/*{
+			{
 				accessorKey: "total_price",
 				header: "Total Price",
 				Cell: ({ cell }) => `₹${cell.getValue<number>().toFixed(2)}`,
-			},*/
+			},
 		],
 		[items, attributeOptionsMap, invalidItems, loadingRows],
 	);
