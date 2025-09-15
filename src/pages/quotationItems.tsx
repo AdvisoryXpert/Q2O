@@ -357,6 +357,7 @@ const QuotationItems = () => {
 
 		const updatedItems = items.map((item) => ({
 			...item,
+			quantity: Number(item.quantity) || 1,
 			is_selected: rowSelection[item.quote_item_id] === true,
 		}));
 
@@ -505,6 +506,7 @@ const QuotationItems = () => {
 
 		const updatedItems = items.map((item) => ({
 			...item,
+			quantity: Number(item.quantity) || 1,
 			is_selected: rowSelection[item.quote_item_id] === true,
 		}));
 
