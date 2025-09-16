@@ -80,18 +80,26 @@ router.post('/:quote_id', async (req, res) => {
 
       const quote = quotesResult[0];
 
-      // Insert into orders
-      const orderData = {
-        quote_id: quote.quote_id,
-        user_id: quote.user_id,
-        dealer_id: quote.dealer_id,
-        total_price: quote.total_price,
-        status: 'For Dispatch',
-        date_created: new Date(),
-        tenant_id
-      };
+      // Calculate the total price from selected quotation items
+      db.query('SELECT SUM(total_price) as total FROM quotationitems WHERE quote_id = ? AND tenant_id = ? AND is_selected = 1', [quote_id, tenant_id], (err, sumResult) => {
+        if (err) {
+          return res.status(500).json({ error: 'Failed to calculate total price' });
+        }
 
-      db.query('INSERT INTO orders SET ?', orderData, (err, orderResult) => {
+        const totalPrice = sumResult[0].total || 0;
+
+        // Insert into orders
+        const orderData = {
+          quote_id: quote.quote_id,
+          user_id: quote.user_id,
+          dealer_id: quote.dealer_id,
+          total_price: totalPrice, // Use the calculated total price
+          status: 'For Dispatch',
+          date_created: new Date(),
+          tenant_id
+        };
+
+        db.query('INSERT INTO orders SET ?', orderData, (err, orderResult) => {
         if (err) {
           console.error('Failed to insert order:', err);
           return res.status(500).json({ error: 'Failed to create order' });
@@ -139,6 +147,7 @@ router.post('/:quote_id', async (req, res) => {
         });
       });
     });
+  });
   } catch (error) {
     console.error('Unexpected error:', error);
     res.status(500).json({ error: 'Something went wrong' });

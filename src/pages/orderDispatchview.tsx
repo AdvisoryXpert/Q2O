@@ -1,7 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import TopAppBar from '../navBars/topAppBar';
-import App from '../App';
-import { useNavAccess } from '../navBars/navBars';
 import {
 	Box,
 	Typography,
@@ -14,6 +11,7 @@ import {
 	TableRow,
 	Paper,
 	TablePagination,
+	Toolbar,
 } from '@mui/material';
 import { http } from '../lib/http'; 
 import { useParams } from 'react-router-dom';
@@ -55,138 +53,129 @@ const OrderDispatchView = () => {
 		setPage(0);
 	};
 
-  
-  
-
-	const navItems = useNavAccess();
-
 	return (
-		<>
-			<TopAppBar navItems={navItems} />
-			<Box sx={{ mt: 10, mb: 10, px: 4 }}>
-				<Typography variant="h5" gutterBottom>
-					Order Dispatch Summary
-				</Typography>
+		<Box sx={{ p: 3 }}>
+			<Toolbar />
+			<Typography variant="h5" gutterBottom>
+				Order Dispatch Summary
+			</Typography>
 
-				{orderHeader && (
-					<TableContainer component={Paper} 
-						sx={{ mb: 4, border: '1px solid #90caf9', borderRadius: 2, backgroundColor: '#e3f2fd' }}>
-						<Table stickyHeader size="small" 
-							sx={{ '& tbody tr:hover': 
+			{orderHeader && (
+				<TableContainer component={Paper} 
+					sx={{ mb: 4, border: '1px solid #90caf9', borderRadius: 2, backgroundColor: '#e3f2fd' }}>
+					<Table stickyHeader size="small" 
+						sx={{ '& tbody tr:hover': 
               { backgroundColor: '#f5f5f5' }, '& th': { backgroundColor: '#eeeeee' } }}>
-							<TableHead>
-								<TableRow>
-									<TableCell colSpan={2}><strong>Order Header</strong></TableCell>
-								</TableRow>
-							</TableHead>
-							<TableBody>
-								<TableRow>
-									<TableCell>Order ID</TableCell>
-									<TableCell>{orderHeader.order_id}</TableCell>
-								</TableRow>
-								<TableRow>
-									<TableCell>Quote ID</TableCell>
-									<TableCell>{orderHeader.quote_id}</TableCell>
-								</TableRow>
-								<TableRow>
-									<TableCell>Status</TableCell>
-									<TableCell>
-										<Box display="inline-flex">
-											<Box
-												component="span"
-												sx={{
-													backgroundColor: 
+						<TableHead>
+							<TableRow>
+								<TableCell colSpan={2}><strong>Order Header</strong></TableCell>
+							</TableRow>
+						</TableHead>
+						<TableBody>
+							<TableRow>
+								<TableCell>Order ID</TableCell>
+								<TableCell>{orderHeader.order_id}</TableCell>
+							</TableRow>
+							<TableRow>
+								<TableCell>Quote ID</TableCell>
+								<TableCell>{orderHeader.quote_id}</TableCell>
+							</TableRow>
+							<TableRow>
+								<TableCell>Status</TableCell>
+								<TableCell>
+									<Box display="inline-flex">
+										<Box
+											component="span"
+											sx={{
+												backgroundColor: 
                         orderHeader.status === 'Dispatched' ? '#fbc02d' : '#1976d2',
-													color: '#fff',
-													px: 2,
-													py: 0.5,
-													borderRadius: 2,
-													fontWeight: 'bold',
-													fontSize: '0.8rem'
-												}}
-											>
-												{orderHeader.status}
-											</Box>
+												color: '#fff',
+												px: 2,
+												py: 0.5,
+												borderRadius: 2,
+												fontWeight: 'bold',
+												fontSize: '0.8rem'
+											}}
+										>
+											{orderHeader.status}
 										</Box>
-									</TableCell>
-								</TableRow>
-								<TableRow>
-									<TableCell>Customer Name</TableCell>
-									<TableCell>{orderHeader.customer_name}</TableCell>
-								</TableRow>
-							</TableBody>
-							<TableBody>
-								<TableRow sx={{ backgroundColor: '#1565c0' }}>
-									<TableCell colSpan={3} align="right">
-										<Typography variant="subtitle1" fontWeight="bold" 
-											color="#ffffff">Gross Total</Typography>
-									</TableCell>
-									<TableCell>
-										<Typography variant="subtitle1" fontWeight="bold" color="white">
-											₹{
-												orderLines.reduce((sum, item) =>
-													sum + (item.total_price || 0), 0).toLocaleString('en-IN')
-											}
-										</Typography>
-									</TableCell>
-								</TableRow>
-							</TableBody>
-						</Table>
-					</TableContainer>
-				)}
+									</Box>
+								</TableCell>
+							</TableRow>
+							<TableRow>
+								<TableCell>Customer Name</TableCell>
+								<TableCell>{orderHeader.customer_name}</TableCell>
+							</TableRow>
+						</TableBody>
+						<TableBody>
+							<TableRow sx={{ backgroundColor: '#1565c0' }}>
+								<TableCell colSpan={3} align="right">
+									<Typography variant="subtitle1" fontWeight="bold" 
+										color="#ffffff">Gross Total</Typography>
+								</TableCell>
+								<TableCell>
+									<Typography variant="subtitle1" fontWeight="bold" color="white">
+										₹{
+											orderLines.reduce((sum, item) =>
+												sum + (item.total_price || 0), 0).toLocaleString('en-IN')
+										}
+									</Typography>
+								</TableCell>
+							</TableRow>
+						</TableBody>
+					</Table>
+				</TableContainer>
+			)}
 
-				<Typography variant="h6" gutterBottom sx={{ mt: 4 }}>Order Line Items</Typography>
-				{orderLines.length > 0 ? (
-					<TableContainer component={Paper} 
-						sx={{ border: '1px solid #90caf9', borderRadius: 2, 
-							overflow: 'hidden', backgroundColor: '#fafafa' }}>
-						<Table>
-							<TableHead>
-								<TableRow>
-									<TableCell><strong>🛒 Product</strong></TableCell>
-									<TableCell><strong>🔢 Quantity</strong></TableCell>
-									<TableCell><strong>💰 Unit Price</strong></TableCell>
-									<TableCell><strong>🧾 Total</strong></TableCell>
+			<Typography variant="h6" gutterBottom sx={{ mt: 4 }}>Order Line Items</Typography>
+			{orderLines.length > 0 ? (
+				<TableContainer component={Paper} 
+					sx={{ border: '1px solid #90caf9', borderRadius: 2, 
+						overflow: 'hidden', backgroundColor: '#fafafa' }}>
+					<Table>
+						<TableHead>
+							<TableRow>
+								<TableCell><strong>🛒 Product</strong></TableCell>
+								<TableCell><strong>🔢 Quantity</strong></TableCell>
+								<TableCell><strong>💰 Unit Price</strong></TableCell>
+								<TableCell><strong>🧾 Total</strong></TableCell>
+							</TableRow>
+						</TableHead>
+						<TableBody>
+							{orderLines.slice
+							(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((item, idx) => (
+								<TableRow key={idx} hover>
+									<TableCell>{item.product_name}</TableCell>
+									<TableCell>{item.quantity}</TableCell>
+									<TableCell>₹{item.unit_price}</TableCell>
+									<TableCell>₹{item.total_price}</TableCell>
 								</TableRow>
-							</TableHead>
-							<TableBody>
-								{orderLines.slice
-								(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((item, idx) => (
-									<TableRow key={idx} hover>
-										<TableCell>{item.product_name}</TableCell>
-										<TableCell>{item.quantity}</TableCell>
-										<TableCell>₹{item.unit_price}</TableCell>
-										<TableCell>₹{item.total_price}</TableCell>
-									</TableRow>
-								))}
-							</TableBody>
-						</Table>
-						<TablePagination
-							component="div"
-							count={orderLines.length}
-							page={page}
-							onPageChange={handleChangePage}
-							rowsPerPage={rowsPerPage}
-							onRowsPerPageChange={handleChangeRowsPerPage}
-						/>
-					</TableContainer>
-				) : (
-					<Typography variant="body1" sx={{ mt: 2 }}>
-						No line items available for this order.
-					</Typography>
-				)}
+							))}
+						</TableBody>
+					</Table>
+					<TablePagination
+						component="div"
+						count={orderLines.length}
+						page={page}
+						onPageChange={handleChangePage}
+						rowsPerPage={rowsPerPage}
+						onRowsPerPageChange={handleChangeRowsPerPage}
+					/>
+				</TableContainer>
+			) : (
+				<Typography variant="body1" sx={{ mt: 2 }}>
+					No line items available for this order.
+				</Typography>
+			)}
 
-				<Button
-					variant="contained"
-					sx={{ mt: 4 }}
-					onClick={() => window.history.back()}
-				>
-					Back to Quotes
-				</Button>
-			</Box>
-			<App />
-
-		</>
+			<Button
+				variant="contained"
+				sx={{ mt: 4 }}
+				onClick={() => window.history.back()}
+			>
+				Back to Quotes
+			</Button>
+		</Box>
 	);
 };
 

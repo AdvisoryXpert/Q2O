@@ -522,7 +522,7 @@ const QuotationItems = () => {
 			const dispatchResponse = await http.post(`/quotestoorder/${quoteId}`);
 			const dispatchResult = dispatchResponse.data;
 
-			if (dispatchResponse.status === 200) {
+			if (dispatchResponse.status === 200 || dispatchResponse.status === 201) {
 				navigate(`/Order-Line-Items/${dispatchResult.order_id}`);
 			} else {
 				alert(`❌ Dispatch Failed: ${dispatchResult.error || "Unknown error"}`);
