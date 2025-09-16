@@ -1,7 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const util = require('util');
 
+// Promisify db.query to use async/await
+const query = util.promisify(db.query).bind(db);
 
 //Fetch Quotes by dealer id
 // GET: Quotes filtered by dealer_id
@@ -72,85 +75,106 @@ router.post('/:quote_id', async (req, res) => {
   const tenant_id = req.tenant_id;
 
   try {
-    // Fetch quote details
-    db.query('SELECT * FROM quotation WHERE quote_id = ? AND tenant_id = ?', [quote_id, tenant_id], (err, quotesResult) => {
-      if (err || quotesResult.length === 0) {
-        return res.status(404).json({ error: 'Quote not found' });
-      }
+    // Get selected quotation items and join with products to get product_name
+    const selectedItems = await query(
+      `SELECT qi.*, p.name as product_name 
+       FROM ro_cpq.quotationitems qi
+       JOIN ro_cpq.product p ON qi.product_id = p.product_id
+       WHERE qi.quote_id = ? AND qi.tenant_id = ? AND qi.is_selected = 1`,
+      [quote_id, tenant_id]
+    );
 
-      const quote = quotesResult[0];
+    if (selectedItems.length === 0) {
+      return res.status(400).json({ error: 'No items selected to create an order.' });
+    }
 
-      // Calculate the total price from selected quotation items
-      db.query('SELECT SUM(total_price) as total FROM quotationitems WHERE quote_id = ? AND tenant_id = ? AND is_selected = 1', [quote_id, tenant_id], (err, sumResult) => {
-        if (err) {
-          return res.status(500).json({ error: 'Failed to calculate total price' });
-        }
+    // Check if an order already exists for any of the selected items
+    const productTuples = selectedItems.map(item => [item.product_id, item.product_attribute_id]);
 
-        const totalPrice = sumResult[0].total || 0;
+    const existingOrderLines = await query(
+      `SELECT o.order_id, ol.product_id, ol.product_attribute_id
+       FROM ro_cpq.order_line ol
+       JOIN ro_cpq.orders o ON ol.order_id = o.order_id
+       WHERE o.quote_id = ? AND (ol.product_id, ol.product_attribute_id) IN (?)`,
+      [quote_id, productTuples]
+    );
 
-        // Insert into orders
-        const orderData = {
-          quote_id: quote.quote_id,
-          user_id: quote.user_id,
-          dealer_id: quote.dealer_id,
-          total_price: totalPrice, // Use the calculated total price
-          status: 'For Dispatch',
-          date_created: new Date(),
-          tenant_id
+    if (existingOrderLines.length > 0) {
+      const alreadyOrderedItems = selectedItems.filter(si =>
+        existingOrderLines.some(eol =>
+          eol.product_id === si.product_id && eol.product_attribute_id === si.product_attribute_id
+        )
+      );
+
+      const errorDetails = alreadyOrderedItems.map(item => {
+        const orderLine = existingOrderLines.find(eol =>
+          eol.product_id === item.product_id && eol.product_attribute_id === item.product_attribute_id
+        );
+        return {
+          product_name: item.product_name,
+          order_id: orderLine.order_id
         };
-
-        db.query('INSERT INTO orders SET ?', orderData, (err, orderResult) => {
-        if (err) {
-          console.error('Failed to insert order:', err);
-          return res.status(500).json({ error: 'Failed to create order' });
-        }
-
-        const order_id = orderResult.insertId;
-
-        // Fetch all quotation items for the quote
-        db.query('SELECT * FROM quotationitems WHERE is_selected=1 and quote_id = ? AND tenant_id = ?', [quote_id, tenant_id], (err, itemsResult) => {
-          if (err) {
-            return res.status(500).json({ error: 'Failed to fetch quote items' });
-          }
-
-          // Insert each into order_line_items
-          const values = itemsResult.map(item => [
-            order_id,
-            item.product_id,
-            item.product_attribute_id,
-            item.unit_price,
-            item.total_price,
-            item.quantity,
-            tenant_id
-          ]);
-
-          if (values.length === 0) {
-            return res.status(200).json({ message: 'Order created with no items.', order_id });
-          }
-
-          const insertQuery = `
-            INSERT INTO order_line (order_id, product_id, product_attribute_id,unit_price, total_price, quantity, tenant_id)
-            VALUES ?
-          `;
-
-          db.query(insertQuery, [values], (err) => {
-            if (err) {
-              console.error('Failed to insert line items:', err);
-              return res.status(500).json({ error: 'Failed to create order items' });
-            }
-
-            res.status(201).json({
-              message: 'Dispatch order created successfully',
-              order_id
-            });
-          });
-        });
       });
+
+      const errorMessages = errorDetails.map(detail =>
+        `Product "${detail.product_name}" is already in Order ID: ${detail.order_id}`
+      );
+
+      return res.status(400).json({
+        error: `Order already created for some items:\n${errorMessages.join('\n')}`
+      });
+    }
+
+    // --- Proceed with order creation ---
+
+    // Fetch quote details
+    const quotesResult = await query('SELECT * FROM ro_cpq.quotation WHERE quote_id = ? AND tenant_id = ?', [quote_id, tenant_id]);
+    if (quotesResult.length === 0) {
+      return res.status(404).json({ error: 'Quote not found' });
+    }
+    const quote = quotesResult[0];
+
+    // Calculate total price from selected items
+    const totalPrice = selectedItems.reduce((sum, item) => sum + item.total_price, 0);
+
+    // Insert into orders
+    const orderData = {
+      quote_id: quote.quote_id,
+      user_id: quote.user_id,
+      dealer_id: quote.dealer_id,
+      total_price: totalPrice,
+      status: 'For Dispatch',
+      date_created: new Date(),
+      tenant_id
+    };
+    const orderResult = await query('INSERT INTO ro_cpq.orders SET ?', orderData);
+    const order_id = orderResult.insertId;
+
+    // Insert into order_line_items
+    const values = selectedItems.map(item => [
+      order_id,
+      item.product_id,
+      item.product_attribute_id,
+      item.unit_price,
+      item.total_price,
+      item.quantity,
+      tenant_id
+    ]);
+
+    const insertQuery = `
+      INSERT INTO ro_cpq.order_line (order_id, product_id, product_attribute_id, unit_price, total_price, quantity, tenant_id)
+      VALUES ?
+    `;
+    await query(insertQuery, [values]);
+
+    res.status(201).json({
+      message: 'Dispatch order created successfully',
+      order_id
     });
-  });
+
   } catch (error) {
-    console.error('Unexpected error:', error);
-    res.status(500).json({ error: 'Something went wrong' });
+    console.error('Error creating dispatch order:', error);
+    res.status(500).json({ error: 'Failed to create dispatch order' });
   }
 });
 

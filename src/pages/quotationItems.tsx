@@ -527,9 +527,13 @@ const QuotationItems = () => {
 			} else {
 				alert(`❌ Dispatch Failed: ${dispatchResult.error || "Unknown error"}`);
 			}
-		} catch (error) {
+		} catch (error: any) {
 			console.error("Dispatch error:", error);
-			alert("❌ Server error occurred while dispatching order.");
+			if (error.response && error.response.data && error.response.data.error) {
+				alert(`❌ Dispatch Failed: ${error.response.data.error}`);
+			} else {
+				alert("❌ Server error occurred while dispatching order.");
+			}
 		}
 	};
 
