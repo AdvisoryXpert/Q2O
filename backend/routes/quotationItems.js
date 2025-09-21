@@ -15,10 +15,12 @@ module.exports = (db) => {
         qi.quantity,
         qi.unit_price,
         (qi.quantity * qi.unit_price) AS total_price,
-        IFNULL(qi.is_selected, TRUE) AS is_selected
+        IFNULL(qi.is_selected, TRUE) AS is_selected,
+        q.dealer_id
       FROM ro_cpq.quotationitems qi
       JOIN ro_cpq.product p ON qi.product_id = p.product_id
       JOIN ro_cpq.product_attribute pa ON qi.product_attribute_id = pa.attribute_id
+      JOIN ro_cpq.quotation q ON qi.quote_id = q.quote_id
       WHERE qi.quote_id = ? AND qi.tenant_id = ?;
     `;
 
@@ -34,8 +36,7 @@ module.exports = (db) => {
       const totalSum = items.reduce((sum, item) => sum + item.total_price, 0);
 
       db.query(noteQuery, [quoteId, tenant_id], (noteErr, noteResult) => {
-        const note = !noteErr && noteResult.length > 0 ? noteResult[0].note : '';
-        res.json({ items, totalSum, note });
+        res.json(items);
       });
     });
   });

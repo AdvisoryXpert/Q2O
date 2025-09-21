@@ -118,5 +118,41 @@ module.exports = function (db) {
     });
   });
 
+  // GET tenant by ID
+  router.get('/tenant/:id', (req, res) => {
+    const { id } = req.params;
+    if (!id) return res.status(400).json({ error: "Tenant ID is required" });
+
+    const query = 'SELECT name as tenant_name, email as tenant_email, phone as tenant_phone, address as tenant_address, gstin as tenant_gstin, cin as tenant_cin FROM ro_cpq.tenants WHERE tenant_id = ?';
+    db.query(query, [id], (err, results) => {
+      if (err) {
+        console.error('DB Error:', err);
+        return res.status(500).json({ error: 'Database error' });
+      }
+      if (results.length === 0) {
+        return res.status(404).json({ error: 'Tenant not found' });
+      }
+      res.json(results[0]);
+    });
+  });
+
+  // GET user by ID
+  router.get('/user/:id', (req, res) => {
+    const { id } = req.params;
+    if (!id) return res.status(400).json({ error: "User ID is required" });
+
+    const query = 'SELECT full_name, email, phone FROM ro_cpq.users WHERE user_id = ?';
+    db.query(query, [id], (err, results) => {
+      if (err) {
+        console.error('DB Error:', err);
+        return res.status(500).json({ error: 'Database error' });
+      }
+      if (results.length === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      res.json(results[0]);
+    });
+  });
+
   return router;
 };

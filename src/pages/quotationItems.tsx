@@ -23,6 +23,7 @@ import autoTable from "jspdf-autotable";
 import { http } from "../lib/http";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
+import { jwtDecode } from "jwt-decode";
 
 type QuotationItem = {
   product_id: number;
@@ -57,6 +58,21 @@ type Note = {
   created_at?: string;
 };
 
+type Tenant = {
+  tenant_name: string;
+  tenant_email: string;
+  tenant_phone: string;
+  tenant_address: string;
+  tenant_gstin: string;
+  tenant_cin: string;
+};
+
+type User = {
+    full_name: string;
+    email: string;
+    phone: string;
+};
+
 const calculateMarginalPrice = (item: QuotationItem): number => {
 	if (item.cost_price && item.min_margin_percent) {
 		return parseFloat((item.cost_price * (1 - item.min_margin_percent / 100)).toFixed(2));
@@ -86,23 +102,75 @@ const QuotationItems = () => {
 	const showError = (msg: string) => setSnackbar({ open: true, message: msg });
 	const [dealerId, setDealerId] = useState<number | null>(null);
 	const [dealerContact, setDealerContact] = useState<string | null>(null);
+	const [dealerName, setDealerName] = useState<string | null>(null);
+	const [dealerGst, setDealerGst] = useState<string | null>(null);
+	const [tenant, setTenant] = useState<Tenant | null>(null);
+	const [user, setUser] = useState<User | null>(null);
 	const [showWhatsAppOptions, setShowWhatsAppOptions] = useState(false);
 	const navigate = useNavigate();
+
+	useEffect(() => {
+		const token = localStorage.getItem("token");
+		if (token) {
+			try {
+				const decodedToken: { tenantId: number } = jwtDecode(token);
+				const tenantId = decodedToken.tenantId;
+				if (tenantId) {
+					http.get(`/dealers/tenant/${tenantId}`)
+						.then(res => {
+							setTenant(res.data);
+						})
+						.catch(err => {
+							console.error("Failed to fetch tenant details:", err);
+						});
+				}
+			} catch (error) {
+				console.error("Failed to decode token:", error);
+			}
+		}
+	}, []);
+
+	useEffect(() => {
+		const token = localStorage.getItem("token");
+		if (token) {
+			try {
+				const decodedToken: { userId: number } = jwtDecode(token);
+				const userId = decodedToken.userId;
+				if (userId) {
+					http.get(`/dealers/user/${userId}`)
+						.then(res => {
+							setUser(res.data);
+						})
+						.catch(err => {
+							console.error("Failed to fetch user details:", err);
+						});
+				}
+			} catch (error) {
+				console.error("Failed to decode token:", error);
+			}
+		}
+	}, []);
 
 	useEffect(() => {
 		if (dealerId) {
 			http.get(`/dealers/${dealerId}`)
 				.then(res => {
 					const data = res.data;
-					if (data && data.phone) {
+					if (data) {
+						setDealerName(data.full_name);
 						setDealerContact(data.phone);
+						setDealerGst(data.gst_number);
 					} else {
+						setDealerName(null);
 						setDealerContact(null);
+						setDealerGst(null);
 					}
 				})
 				.catch(err => {
-					console.error("Failed to fetch dealer contact:", err);
+					console.error("Failed to fetch dealer details:", err);
+					setDealerName(null);
 					setDealerContact(null);
+					setDealerGst(null);
 				});
 		}
 	}, [dealerId]);
@@ -377,6 +445,8 @@ const QuotationItems = () => {
 	};
 
 	const generatePdf = (withBreakup = false, withNotes = false): jsPDF => {
+		console.log("Generating PDF with tenant:", tenant);
+		console.log("Generating PDF with user:", user);
 		const doc = new jsPDF({
 			orientation: "portrait",
 			unit: "mm",
@@ -390,68 +460,148 @@ const QuotationItems = () => {
 			0,
 		);
 
+		const rupeeSymbol = "Rs.";
+
+		// Header
+		doc.setFontSize(20);
+		doc.text("QUOTATION", 105, 15, { align: "center" });
+
+		// Details Section
+		doc.setFontSize(10);
+		if (tenant && user) {
+			doc.text(`Store Name: ${tenant.tenant_name}`, 10, 30);
+			doc.text(`Store Email: ${user.email}`, 10, 35);
+			doc.text(`Store Contact Number: ${user.phone}`, 10, 40);
+			doc.text(`Date & Time: ${new Date().toLocaleString()}`, 10, 45);
+
+			doc.text(`Place of Supply: K`, 150, 30);
+			doc.text(`GSTIN: ${tenant.tenant_gstin}`, 150, 35);
+			doc.text(`Quotation Number: ${quoteId}`, 150, 40);
+		}
+
+		// Customer Details
+		doc.setFontSize(12);
+		if (dealerName) {
+			doc.text(`Customer Name: ${dealerName}`, 10, 60);
+			if (dealerContact) {
+				doc.text(`Contact Number: ${dealerContact}`, 10, 65);
+			}
+			if (dealerGst) {
+				doc.text(`GST In: ${dealerGst}`, 10, 70);
+			}
+		}
+
 		const head = withBreakup
 			? [
 				[
-					"Product ID",
-					"Product Name",
-					"Attribute",
-					"Quantity",
-					"Unit Price",
-					"Total Price",
+					"Item Code Description",
+					"HSN",
+					"Unit Amt.",
+					"QTY",
+					"Disc% Disc Amt.",
+					"Taxable Value",
+					"CGST Value CGST%",
+					"SGST Value SGST%",
+					"IGST Value IGST%",
+					"Billed Amt.",
 				],
 			]
 			: [["Product ID", "Product Name", "Attribute", "Total Price"]];
 
 		const body = selectedItems.map((item) => {
-			doc.setFont("helvetica", "normal");
-			return withBreakup
-				? [
-					item.product_id,
+			if (withBreakup) {
+				return [
 					item.product_name,
-					item.attribute_name,
+					"", // HSN
+					`${rupeeSymbol} ${item.unit_price.toFixed(2)}`,
 					Number(item.quantity),
-					`₹${item.unit_price.toFixed(2)}`,
-					`₹${item.total_price.toFixed(2)}`,
-				]
-				: [
+					"", // Disc
+					`${rupeeSymbol} ${item.total_price.toFixed(2)}`,
+					"", // CGST
+					"", // SGST
+					"", // IGST
+					`${rupeeSymbol} ${item.total_price.toFixed(2)}`,
+				];
+			} else {
+				return [
 					item.product_id,
 					item.product_name,
 					item.attribute_name,
-					`₹${item.total_price.toFixed(2)}`,
+					`${rupeeSymbol} ${item.total_price.toFixed(2)}`,
 				];
+			}
 		});
-    
-		doc.text(`Quotation Items for Quote ID: ${quoteId}`, 10, 10);
-		autoTable(doc, { head, body, startY: 20 });
 
-		let endY = (doc as any).lastAutoTable?.finalY || 30;
-		doc.text(`Total Sum: ₹${totalSum.toFixed(2)}`, 10, endY + 10);
+		autoTable(doc, {
+			head,
+			body,
+			startY: 75,
+			headStyles: {
+				fillColor: [66, 133, 244],
+				textColor: [255, 255, 255],
+				fontStyle: 'bold',
+			},
+			styles: {
+				lineWidth: 0.1,
+				lineColor: [0, 0, 0],
+				overflow: 'linebreak',
+				fontSize: 8,
+				font: 'times'
+			},
+			columnStyles: {
+				0: { cellWidth: 30 },
+				1: { cellWidth: 15 },
+				2: { cellWidth: 20 },
+				3: { cellWidth: 10 },
+				4: { cellWidth: 20 },
+				5: { cellWidth: 20 },
+				6: { cellWidth: 20 },
+				7: { cellWidth: 20 },
+				8: { cellWidth: 20 },
+				9: { cellWidth: 20 },
+			},
+			tableWidth: 'auto',
+			minCellHeight: 10
+		});
 
+		let endY = (doc as any).lastAutoTable.finalY;
+		doc.setFontSize(12);
+		doc.text(`Total: ${rupeeSymbol} ${totalSum.toFixed(2)}`, 10, endY + 10);
+
+		endY = endY + 30; // for spacing
+
+		// Notes
 		if (withNotes && notes.length > 0) {
-			doc.addPage();
 			doc.setFontSize(14);
-			doc.text(`Notes for Quote ID: ${quoteId}`, 10, 20);
+			doc.text(`Notes for Quote ID: ${quoteId}`, 10, endY);
+			endY = endY + 5;
 
 			notes.forEach((note, index) => {
 				const date = note.created_at
 					? new Date(note.created_at).toLocaleString()
 					: "No Date";
 				doc.setFontSize(10);
-				doc.text(`${index + 1}. ${date}`, 10, 30 + index * 20);
+				doc.text(`${index + 1}. ${date}`, 10, endY);
+				endY = endY + 5;
 				doc.setFontSize(11);
-				doc.text(
-					doc.splitTextToSize(
-						typeof note.note_text === "string"
-							? note.note_text.replace(/<\/?[^>]+(>|$)/g, "")
-							: JSON.stringify(note.note_text),
-						180,
-					),
-					10,
-					35 + index * 20,
+				const noteText = doc.splitTextToSize(
+					typeof note.note_text === "string"
+						? note.note_text.replace(/<\/?[^>]+(>|$)/g, "")
+						: JSON.stringify(note.note_text),
+					180,
 				);
+				doc.text(noteText, 10, endY);
+				endY = endY + (noteText.length * 5);
 			});
 		}
+
+		// Footer
+		if (tenant) {
+			doc.setFontSize(8);
+			doc.text(tenant.tenant_name, 105, 280, { align: "center" });
+			doc.text(tenant.tenant_address, 105, 285, { align: "center" });
+		}
+
 		return doc;
 	};
 
