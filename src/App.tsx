@@ -13,6 +13,15 @@ type DealerData = {
 }
 
 function App() {
+	// Guard to mount ChatBot only once in React 18 StrictMode (dev)
+	const mountChatRef = useRef(false);
+	const [mountChat, setMountChat] = useState(false);
+	useEffect(() => {
+		if (mountChatRef.current) return;
+		mountChatRef.current = true;
+		setMountChat(true);
+	}, []);
+
 	// Initial state
 	const initialState = {
 		dealerData: {
@@ -331,19 +340,21 @@ function App() {
 		<div className="App">
 			<header className="App-header">
 				<div style={{ display: "flex", justifyContent: "center", alignItems: "center", marginTop: "20vh" }}>
-					<ChatBot
-						id="chatbot-id"
-						flow={flow}
-						settings={{
-							audio: { disabled: false },
-							chatInput: { botDelay: 1000 },
-							userBubble: { showAvatar: true },
-							botBubble: { showAvatar: true },
-							voice: { disabled: false },
-							sensitiveInput: { asterisksCount: 6 },
-							header: { title: "RO Supplier Chennai" },
-						}}
-					/>
+					{mountChat && (
+						<ChatBot
+							id="chatbot-id"
+							flow={flow}
+							settings={{
+								audio: { disabled: false },
+								chatInput: { botDelay: 1000 },
+								userBubble: { showAvatar: true },
+								botBubble: { showAvatar: true },
+								voice: { disabled: false },
+								sensitiveInput: { asterisksCount: 6 },
+								header: { title: "RO Supplier Chennai" },
+							}}
+						/>
+					)}
 				</div>
 			</header>
 		</div>

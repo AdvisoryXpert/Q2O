@@ -18,7 +18,6 @@ import ReminderSection from "../components/reminders";
 import GoogleAds from "../components/Dashboard/GoogleAds";
 import RecentQuotes from "../components/Dashboard/RecentQuotes";
 import OrdersOverview from "../components/Dashboard/OrdersOverview";
-import App from "../App";
 import { useNavigate } from "react-router-dom";
 import DealerFollowUps from "../components/Dashboard/DealerFollowUps";
 
@@ -150,10 +149,6 @@ const ChatbotHome: React.FC = () => {
 				</Grid>
 			</Container>
 
-			{/* Floating Chatbot */}
-			<Box sx={{ position: "fixed", bottom: 16, right: 16, zIndex: 999 }}>
-				<App />
-			</Box>
 		</Box>
 	);
 };

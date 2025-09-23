@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import TopAppBar from '../navBars/topAppBar';
-import App from '../App';
 import { useNavAccess } from '../navBars/navBars';
 import {
 	Box,
@@ -125,7 +124,6 @@ const OrderDispatchPOSView = () => {
 					<Typography>No line items found.</Typography>
 				)}
 			</Box>
-			<App />
 		</>
 	);
 };
