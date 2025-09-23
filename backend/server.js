@@ -154,6 +154,10 @@ app.use('/api/quotestoorder', quotestoorderRoutes);
 const followupsRouter = require('./routes/followups');
 app.use('/api/followups', followupsRouter);
 
+// Dealer Followups
+const dealerFollowupsRouter = require('./routes/dealerFollowups');
+app.use('/api/dealer-followups', dealerFollowupsRouter);
+
 // Orders
 const postoorderRoutes = require('./routes/orders')(db);
 app.use('/api/orders', postoorderRoutes);

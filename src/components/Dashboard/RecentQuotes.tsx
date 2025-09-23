@@ -172,6 +172,7 @@ export default function RecentQuotes({ limit = 10 }: { limit?: number }) {
 				borderRadius: 2,
 				border: (t) => `1px solid ${t.palette.divider}`,
 				overflow: "hidden",
+				width: "100%",
 			}}
 		>
 			<Typography variant="h6" fontWeight={800} sx={{ mb: 1 }}>

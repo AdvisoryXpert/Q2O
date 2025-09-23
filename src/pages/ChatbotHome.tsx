@@ -15,10 +15,12 @@ import {
 import SearchIcon from "@mui/icons-material/Search";
 import NotificationsActiveIcon from "@mui/icons-material/NotificationsActive";
 import ReminderSection from "../components/reminders";
+import GoogleAds from "../components/Dashboard/GoogleAds";
 import RecentQuotes from "../components/Dashboard/RecentQuotes";
 import OrdersOverview from "../components/Dashboard/OrdersOverview";
 import App from "../App";
 import { useNavigate } from "react-router-dom";
+import DealerFollowUps from "../components/Dashboard/DealerFollowUps";
 
 const ChatbotHome: React.FC = () => {
 	const theme = useTheme();
@@ -98,8 +100,8 @@ const ChatbotHome: React.FC = () => {
 			{/* Main content */}
 			<Container maxWidth="xl" sx={{ py: 2 }}>
 				<Grid container spacing={2}>
-					{/* Left column: Reminders */}
-					<Grid item xs={12} md={5} lg={4}>
+					{/* First Row */}
+					<Grid item xs={12} lg={4}>
 						<Paper
 							elevation={0}
 							sx={{
@@ -131,17 +133,19 @@ const ChatbotHome: React.FC = () => {
 							</Box>
 						</Paper>
 					</Grid>
+					<Grid item xs={12} lg={4}>
+						<OrdersOverview />
+					</Grid>
+					<Grid item xs={12} lg={4}>
+						<DealerFollowUps />
+					</Grid>
 
-					{/* Right column: Orders overview + Recent quotes */}
-					<Grid item xs={12} md={7} lg={8}>
-						<Grid container spacing={2} direction="column">
-							<Grid item>
-								<OrdersOverview />
-							</Grid>
-							<Grid item>
-								<RecentQuotes limit={10} />
-							</Grid>
-						</Grid>
+					{/* Second Row */}
+					<Grid item xs={12}>
+						<RecentQuotes limit={10} />
+					</Grid>
+					<Grid item xs={12}>
+						<GoogleAds />
 					</Grid>
 				</Grid>
 			</Container>
