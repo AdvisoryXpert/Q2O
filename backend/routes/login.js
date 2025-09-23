@@ -6,8 +6,6 @@ const qrcode = require('qrcode');
 const jwt = require('jsonwebtoken');
 const router = express.Router();
 
-
-
 module.exports = (db) => {
   router.post('/', (req, res) => {
     const { mobile, password } = req.body;
@@ -38,7 +36,7 @@ module.exports = (db) => {
         return res.json({ success: false, message: 'Incorrect password' });
       }
 
-      // 2FA flow
+      // --- 2FA setup/verify flow ---
       if (user.two_fa_enabled && user['2fa_secret']) {
         return res.json({
           success: true,
@@ -67,7 +65,7 @@ module.exports = (db) => {
         return;
       }
 
-      // 2FA disabled → issue JWT
+      // --- 2FA disabled → issue JWT and set cookie ---
       const token = jwt.sign(
         {
           user_id: user.user_id,
@@ -76,8 +74,17 @@ module.exports = (db) => {
           tenant_id: user.tenant_id,
         },
         process.env.JWT_SECRET || 'dev_secret',
-        { expiresIn: process.env.JWT_EXPIRES || '8h' } // make expiry configurable
+        { expiresIn: process.env.JWT_EXPIRES || '8h' }
       );
+
+      // ✅ Set persistent, httpOnly cookie so session survives page refresh
+      res.cookie('auth_token', token, {
+        httpOnly: true,
+        sameSite: 'lax',     // or 'none' + secure:true if frontend is on another domain/HTTPS
+        secure: false,       // true if using HTTPS in production
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+        path: '/',
+      });
 
       return res.json({
         success: true,
@@ -85,11 +92,12 @@ module.exports = (db) => {
         userRole: user.role,
         userName: user.full_name,
         user_id: user.user_id,
-        mobile: user.phone, // Add mobile number here
+        mobile: user.phone,
       });
     });
   });
 
+  // --- 2FA verification route ---
   router.post('/verify', (req, res) => {
     const { mobile, token } = req.body;
     if (!mobile || !token) {
@@ -117,7 +125,7 @@ module.exports = (db) => {
         secret: user['2fa_secret'],
         encoding: 'base32',
         token: String(token),
-        window: 2 // tighter window
+        window: 2
       });
 
       if (!verified) {
@@ -136,24 +144,33 @@ module.exports = (db) => {
         { expiresIn: process.env.JWT_EXPIRES || '8h' }
       );
 
+      // ✅ Set cookie on successful 2FA verify
+      res.cookie('auth_token', jwtToken, {
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: false,
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+        path: '/',
+      });
+
       return res.json({
         success: true,
         token: jwtToken,
         userRole: user.role,
         userName: user.full_name,
         user_id: user.user_id,
-        mobile: user.phone, // Add mobile number here
+        mobile: user.phone,
         can_regenerate_2fa: user.can_regenerate_2fa
       });
     });
   });
 
+  // --- optional regenerate-2fa route (unchanged) ---
   router.post('/regenerate-2fa', (req, res) => {
     const { mobile } = req.body;
     if (!mobile) {
       return res.status(400).json({ success: false, message: 'Mobile number is required.' });
     }
-
     const query = 'SELECT * FROM ro_cpq.users WHERE phone = ? LIMIT 1';
     db.query(query, [mobile], (err, results) => {
       if (err) {
@@ -163,7 +180,6 @@ module.exports = (db) => {
       if (results.length === 0) {
         return res.json({ success: false, message: 'User not found' });
       }
-
       const user = results[0];
       const secret = speakeasy.generateSecret({ name: `RO_CPQ:${user.email}` });
 
@@ -185,4 +201,3 @@ module.exports = (db) => {
 
   return router;
 };
-

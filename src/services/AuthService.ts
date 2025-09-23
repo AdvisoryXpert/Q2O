@@ -145,6 +145,37 @@ export function clearAuth() {
 export function clearSessionCache() { clearAuth(); }
 
 /**
+ * GET SESSION
+ * Hit the /me endpoint to re-hydrate the session from a valid cookie.
+ */
+export async function getSession(): Promise<LoginResponse> {
+	dlog("getSession → /me");
+	try {
+		const { data } = await http.get<LoginResponse>("/me");
+		dlog("getSession ←", { ok: data?.ok, hasToken: !!data?.token, user: data?.user });
+
+		if (data?.ok) {
+			// If backend returns a new token (e.g., refreshed), update it
+			if (data.token) setToken(data.token);
+
+			// If user object is in response, cache it
+			if (data.user) setUser(data.user);
+
+			// If tenant_id is in response, cache it
+			if (data.tenant_id) setTenantId(data.tenant_id);
+		} else {
+			// If /me returns ok:false, the cookie is invalid, so clear everything
+			clearAuth();
+		}
+		return data;
+	} catch (e) {
+		derr("getSession failed", e);
+		clearAuth(); // Also clear on network/server error
+		return { ok: false, success: false };
+	}
+}
+
+/**
  * LOGIN
  * Works with either { email, password } or { mobile, password }.
  * Your backend returns:
@@ -263,7 +294,8 @@ export async function refreshMe(): Promise<{ user: User | null; tenant_id: strin
  * One-shot init for app start (JWT-first bootstrap)
  */
 export async function initAuth(): Promise<{ user: User | null; tenant_id: string | null }> {
-	return refreshMe();
+	const { ok, user, tenant_id } = await getSession();
+	return { user: ok ? user : null, tenant_id: ok ? tenant_id : null };
 }
 
 /**
