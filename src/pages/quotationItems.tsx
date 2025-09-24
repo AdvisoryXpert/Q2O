@@ -495,15 +495,16 @@ const QuotationItems = () => {
 			? [
 				[
 					"Item Code Description",
-					"HSN",
+					"Attribute",
+					/*"HSN",*/
 					"Unit Amt.",
 					"QTY",
 					"Disc% Disc Amt.",
 					"Taxable Value",
-					"CGST Value CGST%",
+					/*"CGST Value CGST%",
 					"SGST Value SGST%",
-					"IGST Value IGST%",
-					"Billed Amt.",
+					"IGST Value IGST%",*/
+					"Quoted Amt.",
 				],
 			]
 			: [["Product ID", "Product Name", "Attribute", "Total Price"]];
@@ -512,14 +513,15 @@ const QuotationItems = () => {
 			if (withBreakup) {
 				return [
 					item.product_name,
-					"", // HSN
+					item.attribute_name,
+					/*"", // HSN*/
 					`${rupeeSymbol} ${item.unit_price.toFixed(2)}`,
 					Number(item.quantity),
 					"", // Disc
 					`${rupeeSymbol} ${item.total_price.toFixed(2)}`,
-					"", // CGST
+					/*"", // CGST
 					"", // SGST
-					"", // IGST
+					"", // IGST*/
 					`${rupeeSymbol} ${item.total_price.toFixed(2)}`,
 				];
 			} else {
@@ -549,16 +551,16 @@ const QuotationItems = () => {
 				font: 'times'
 			},
 			columnStyles: {
-				0: { cellWidth: 30 },
-				1: { cellWidth: 15 },
-				2: { cellWidth: 20 },
-				3: { cellWidth: 10 },
-				4: { cellWidth: 20 },
-				5: { cellWidth: 20 },
-				6: { cellWidth: 20 },
-				7: { cellWidth: 20 },
-				8: { cellWidth: 20 },
-				9: { cellWidth: 20 },
+				0: { cellWidth: 'auto' },
+				1: { cellWidth: 'auto' },
+				2: { cellWidth: 'auto' },
+				3: { cellWidth: 'auto' },
+				4: { cellWidth: 'auto' },
+				5: { cellWidth: 'auto' },
+				6: { cellWidth: 'auto' },
+				7: { cellWidth: 'auto' },
+				8: { cellWidth: 'auto' },
+				9: { cellWidth: 'auto' },
 			},
 			tableWidth: 'auto',
 			minCellHeight: 10
