@@ -15,18 +15,16 @@ router.get('/', (req, res) => {
             d.is_important,
             'follow-up' as type,
             fu.entity_type,
+            fu.entity_id,
+            fu.followup_id,
             fu.due_date,
             fu.status
-        FROM
-            ro_cpq.follow_ups fu
-        JOIN
-            ro_cpq.dealer d ON fu.tenant_id = d.tenant_id AND (
-                (fu.entity_type = 'quote' AND fu.entity_id IN (SELECT quote_id FROM ro_cpq.quotation WHERE dealer_id = d.dealer_id)) OR
-                (fu.entity_type = 'order' AND fu.entity_id IN (SELECT order_id FROM ro_cpq.orders WHERE dealer_id = d.dealer_id)) OR
-                (fu.entity_type = 'sr' AND fu.entity_id IN (SELECT id FROM ro_cpq.service_requests WHERE dealer_id = d.dealer_id))
-            )
-        WHERE
-            fu.tenant_id = ?
+        FROM ro_cpq.follow_ups fu
+        LEFT JOIN ro_cpq.quotation q ON fu.entity_type = 'quote' AND fu.entity_id = q.quote_id
+        LEFT JOIN ro_cpq.orders o ON fu.entity_type = 'order' AND fu.entity_id = o.order_id
+        LEFT JOIN ro_cpq.service_requests sr ON fu.entity_type = 'sr' AND fu.entity_id = sr.id
+        LEFT JOIN ro_cpq.dealer d ON d.dealer_id = COALESCE(q.dealer_id, o.dealer_id, sr.dealer_id)
+        WHERE fu.tenant_id = ? AND d.dealer_id IS NOT NULL
 
         UNION
 
@@ -37,6 +35,8 @@ router.get('/', (req, res) => {
             d.is_important,
             e.type,
             e.type as entity_type,
+            e.id as entity_id,
+            NULL as followup_id,
             e.date_created as due_date,
             e.status
         FROM (
@@ -76,7 +76,7 @@ router.get('/', (req, res) => {
         const aggregatedFollowUps = {};
 
         results.forEach(row => {
-            const { dealer_id, dealer_name, is_important, entity_type, due_date, status } = row;
+            const { dealer_id, dealer_name, is_important, entity_type, entity_id, followup_id, due_date, status } = row;
             const dueDate = new Date(due_date);
             dueDate.setHours(0, 0, 0, 0);
 
@@ -101,6 +101,8 @@ router.get('/', (req, res) => {
             }
 
             aggregatedFollowUps[dealer_id].follow_ups[entity_type].push({
+                entity_id: entity_id,
+                followup_id: followup_id,
                 due_date: due_date,
                 status: status,
                 days_pending: days_pending,

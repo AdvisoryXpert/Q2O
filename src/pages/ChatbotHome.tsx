@@ -100,7 +100,7 @@ const ChatbotHome: React.FC = () => {
 			<Container maxWidth="xl" sx={{ py: 2 }}>
 				<Grid container spacing={2}>
 					{/* First Row */}
-					<Grid item xs={12} lg={4}>
+					<Grid item xs={12} md={4} sx={{ minWidth: 0 }}>
 						<Paper
 							elevation={0}
 							sx={{
@@ -132,13 +132,14 @@ const ChatbotHome: React.FC = () => {
 							</Box>
 						</Paper>
 					</Grid>
-					<Grid item xs={12} lg={4}>
+					<Grid item xs={12} md={4} sx={{ minWidth: 0 }}>
 						<OrdersOverview />
 					</Grid>
-					<Grid item xs={12} lg={4}>
+					<Grid item xs={12} md={4} sx={{ minWidth: 0 }}>
 						<DealerFollowUps />
 					</Grid>
-
+				</Grid>
+				<Grid container spacing={2} sx={{ mt: 2 }}>
 					{/* Second Row */}
 					<Grid item xs={12}>
 						<RecentQuotes limit={10} />
