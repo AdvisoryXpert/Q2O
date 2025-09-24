@@ -83,19 +83,19 @@ function App() {
 	// Fetch account types
 	useEffect(() => {
 		const fetchAccountTypes = async () => {
-			if (!isAuthenticated()) { // Check if authenticated
-				console.warn("Not authenticated. Skipping account types fetch.");
+			if (!isAuthenticated() || !state.dealerData.dealer_type) {
 				return;
 			}
 			try {
-				const { data } = await http.get('/account-types');
+				const { data } = await http.get(`/account-types?category=${state.dealerData.dealer_type}`);
 				const accountTypeNames = data.map((type: any) => type.account_type_name);
 				setAccountTypes(accountTypeNames);
-			} catch (err) {				console.error("Error fetching account types:", err);
+			} catch (err) {
+				console.error("Error fetching account types:", err);
 			}
 		};
 		fetchAccountTypes();
-	}, [isAuthenticated]);
+	}, [state.dealerData.dealer_type]);
 
 	// Fetch existing dealer ID from previous quotes
 	useEffect(() => {

@@ -7,6 +7,7 @@ module.exports = function verifyToken(req, res, next) {
     ? req.headers.authorization.split(' ')[1]
     : null;
   const token = req.cookies?.auth_token || bearer; // <-- cookie first
+  req.token = token;
 
   if (!token) return res.status(401).json({ message: 'No auth token' });
 

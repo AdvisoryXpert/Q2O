@@ -25,8 +25,9 @@ const DealerFollowUps: React.FC = () => {
 					headers: {
 						Authorization: `Bearer ${token}`,
 					},
+					withCredentials: true,
 				});
-				setDealerFollowUps(response.data);
+				setDealerFollowUps(response.data ?? []);
 			} catch (error) {
 				console.error("Error fetching dealer follow-ups:", error);
 			} finally {
@@ -71,24 +72,46 @@ const DealerFollowUps: React.FC = () => {
 					</Typography>
 				) : dealerFollowUps.length > 0 ? (
 					<Stack spacing={1}>
-						{dealerFollowUps.map((dealer) => (
-							<Box key={dealer.dealer_id}>
+						{dealerFollowUps.map((dealer, i) => (
+							<Box
+								key={
+									dealer.dealer_id ??
+                  dealer.id ??
+                  dealer.phone ??
+                  dealer.email ??
+                  `${dealer.dealer_name ?? "dealer"}-${i}`
+								}
+							>
 								<Typography variant="body2">
 									{dealer.dealer_name}
 									{dealer.is_important ? " *" : ""}
 								</Typography>
-								{Object.keys(dealer.follow_ups).map((entity_type) => (
+
+								{Object.keys(dealer.follow_ups ?? {}).map((entity_type) => (
 									<Box key={entity_type} sx={{ pl: 2 }}>
 										<Typography variant="caption">
-											{entity_type.toUpperCase()}
+											{String(entity_type).toUpperCase()}
 										</Typography>
+
 										<Stack spacing={0.5}>
-											{dealer.follow_ups[entity_type].map((fu: any, index: number) => (
-												<Typography variant="body2" key={index}>
-													- {fu.status} (Due: {new Date(fu.due_date).toLocaleDateString()})
-													{fu.is_overdue && " (Overdue)"}
-												</Typography>
-											))}
+											{(dealer.follow_ups?.[entity_type] ?? []).map(
+												(fu: any, index: number) => (
+													<Typography
+														variant="body2"
+														key={
+															fu.id ??
+                              fu.followup_id ??
+                              fu.lr_id ??
+                              fu.sr_id ??
+                              `${entity_type}-${fu.due_date ?? index}-${index}`
+														}
+													>
+														- {fu.status} (Due:{" "}
+														{new Date(fu.due_date).toLocaleDateString()})
+														{fu.is_overdue && " (Overdue)"}
+													</Typography>
+												)
+											)}
 										</Stack>
 									</Box>
 								))}
