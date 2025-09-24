@@ -53,6 +53,7 @@ router.get('/', (req, res) => {
 
             SELECT 'sr' as type, sr.id as id, sr.created_at as date_created, sr.status, sr.dealer_id, sr.tenant_id
             FROM ro_cpq.service_requests sr
+            WHERE sr.status IN ('Open', 'In Progress', 'Pending')
         ) e
         JOIN
             ro_cpq.dealer d ON e.dealer_id = d.dealer_id AND e.tenant_id = d.tenant_id
@@ -95,6 +96,8 @@ router.get('/', (req, res) => {
                     max_days_pending: 0
                 };
             }
+
+            if (entity_type === 'lr') return;
 
             if (!aggregatedFollowUps[dealer_id].follow_ups[entity_type]) {
                 aggregatedFollowUps[dealer_id].follow_ups[entity_type] = [];

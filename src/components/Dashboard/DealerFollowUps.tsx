@@ -115,7 +115,7 @@ const DealerFollowUps: React.FC = () => {
 										<Typography variant="h6" component="div" sx={{ fontWeight: "bold" }}>
 											{dealer.dealer_name}
 										</Typography>
-										{dealer.is_important && (
+										{dealer.is_important ? (
 											<Typography
 												component="span"
 												sx={{
@@ -126,7 +126,7 @@ const DealerFollowUps: React.FC = () => {
 											>
 												*
 											</Typography>
-										)}
+										) : null}
 									</Stack>
 
 									{Object.keys(dealer.follow_ups ?? {}).map((entity_type) => (
@@ -134,14 +134,15 @@ const DealerFollowUps: React.FC = () => {
 											<Stack spacing={1}>
 												{(dealer.follow_ups?.[entity_type] ?? []).map(
 													(fu: any, index: number) => {
+														const lowerEntityType = entity_type.toLowerCase();
 														let path = "";
-														if (entity_type === "quote")
+														if (lowerEntityType === "quote")
 															path = `/quotation-items/${fu.entity_id}`;
-														else if (entity_type === "sr")
+														else if (lowerEntityType === "sr")
 															path = `/serviceRequest/${fu.entity_id}`;
-														else if (entity_type === "lr")
+														else if (lowerEntityType === "lr")
 															path = `/lr-item?id=${fu.entity_id}`;
-														else if (entity_type === "order")
+														else if (lowerEntityType === "order")
 															path = `/orders/${fu.entity_id}`;
 														return (
 															<Button
@@ -167,7 +168,7 @@ const DealerFollowUps: React.FC = () => {
 																		size="small"
 																		sx={{
 																			backgroundColor:
-																				entityTypeColors[entity_type] ||
+																				entityTypeColors[lowerEntityType] ||
 																				theme.palette.grey[300],
 																			color: "white",
 																			fontWeight: "bold",
