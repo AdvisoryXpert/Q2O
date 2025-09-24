@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { getUserId, isAuthenticated } from "./services/AuthService";
+import { getUserId } from "./services/AuthService";
 import { http } from './lib/http';
 import ChatBot from "./components/ChatBot";
 
@@ -38,6 +38,7 @@ function App() {
 
 	const [state, setState] = useState(initialState);
 	const [accountTypes, setAccountTypes] = useState<string[]>([]);
+
 	const [status, setStatus] = useState({
 		quoteCreated: false,
 		isCreatingQuote: false,
@@ -45,16 +46,6 @@ function App() {
 	});
   
 	const creationLock = useRef(false);
-
-	const resetAllState = () => {
-		setState(initialState);
-		setStatus({
-			quoteCreated: false,
-			isCreatingQuote: false,
-			existingDealerId: null,
-		});
-		creationLock.current = false;
-	};
 
 	const cleanInput = (input: string | undefined): string => {
 		return input?.trim() || "";
@@ -79,23 +70,6 @@ function App() {
 			throw error; // Re-throw to be caught by the calling function
 		}
 	};
-
-	// Fetch account types
-	useEffect(() => {
-		const fetchAccountTypes = async () => {
-			if (!isAuthenticated() || !state.dealerData.dealer_type) {
-				return;
-			}
-			try {
-				const { data } = await http.get(`/account-types?category=${state.dealerData.dealer_type}`);
-				const accountTypeNames = data.map((type: any) => type.account_type_name);
-				setAccountTypes(accountTypeNames);
-			} catch (err) {
-				console.error("Error fetching account types:", err);
-			}
-		};
-		fetchAccountTypes();
-	}, [state.dealerData.dealer_type]);
 
 	// Fetch existing dealer ID from previous quotes
 	useEffect(() => {
@@ -123,9 +97,8 @@ function App() {
 		start: {
 			message: "Welcome to the RO CPQ System! Is this quote for a Dealer or an Individual?",
 			options: ["Dealer", "Individual"],
-			path: (params: Params) => {
+			path: async (params: Params) => {
 				const type = cleanInput(params.userInput) === "Individual" ? "Individual" : "Dealer";
-				resetAllState();
 				setState(prev => ({
 					...prev,
 					dealerData: {
@@ -133,6 +106,15 @@ function App() {
 						dealer_type: type,
 					},
 				}));
+
+				try {
+					const { data } = await http.get(`/account-types?category=${type}`);
+					const accountTypeNames = data.map((t: any) => t.account_type_name);
+					setAccountTypes(accountTypeNames);
+				} catch (err) {
+					console.error("Error fetching account types:", err);
+				}
+
 				return "ask_account_type";
 			},
 		},
