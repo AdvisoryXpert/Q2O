@@ -35,9 +35,6 @@ import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import CloseIcon from "@mui/icons-material/Close";
 import DescriptionIcon from "@mui/icons-material/Description";
 import Inventory2Icon from "@mui/icons-material/Inventory2";
-
-import TopAppBar from "../navBars/topAppBar";
-import { useNavAccess } from "../navBars/navBars";
 import { getUserId } from "../services/AuthService";
 import { useSearchParams } from "react-router-dom";
 import { http } from "../lib/http";
@@ -80,8 +77,6 @@ async function uploadLRAttachment(id: string, file: File) {
 export default function LRReceiptsPage() {
 	const theme = useTheme();
 	const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-	const navItems = useNavAccess();
-
 	// query filter (?id=XYZ)
 	const [searchParams] = useSearchParams();
 	const lrIdFromQuery = searchParams.get("id");
@@ -354,8 +349,6 @@ export default function LRReceiptsPage() {
 	return (
 		<>
 			{/* Global top nav (same as Contact / SR) */}
-			<TopAppBar navItems={navItems} />
-
 			<Paper
 				sx={{
 					position: "fixed",

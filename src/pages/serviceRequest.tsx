@@ -39,8 +39,6 @@ import AssignmentIcon from "@mui/icons-material/Assignment";
 import DescriptionIcon from "@mui/icons-material/Description";
 
 import { useParams } from "react-router-dom";
-import TopAppBar from "../navBars/topAppBar";
-import { useNavAccess } from "../navBars/navBars";
 import { getUserId } from "../services/AuthService";
 
 // ✅ same helper that Contact.tsx uses
@@ -104,7 +102,6 @@ async function uploadAttachment(srId: string, file: File) {
 export default function ServiceRequestTable() {
 	const theme = useTheme();
 	const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-	const navItems = useNavAccess();
 	const { id: routeId } = useParams();
 
 	// Data
@@ -408,8 +405,6 @@ export default function ServiceRequestTable() {
 	return (
 		<>
 			{/* Global top nav (same as Contact) */}
-			<TopAppBar navItems={navItems} />
-
 			<Paper
 				sx={{
 					position: "fixed",
