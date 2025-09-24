@@ -4,17 +4,22 @@ const router = express.Router();
 module.exports = (db) => {
   // Get all account types (tenant-scoped)
   router.get('/', (req, res) => {
-    db.query(
-      'SELECT * FROM ro_cpq.account_types WHERE tenant_id = ?',
-      [req.tenant_id],
-      (err, results) => {
-        if (err) {
-          console.error('[ERROR] DB error during fetching account types:', err);
-          return res.status(500).json({ success: false, message: 'DB error' });
-        }
-        res.json(results);
+    const { category } = req.query;
+    let query = 'SELECT * FROM ro_cpq.account_types WHERE tenant_id = ?';
+    const params = [req.tenant_id];
+
+    if (category) {
+      query += ' AND category = ?';
+      params.push(category);
+    }
+
+    db.query(query, params, (err, results) => {
+      if (err) {
+        console.error('[ERROR] DB error during fetching account types:', err);
+        return res.status(500).json({ success: false, message: 'DB error' });
       }
-    );
+      res.json(results);
+    });
   });
 
   // Create a new account type (stamp tenant_id)
