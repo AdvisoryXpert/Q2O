@@ -339,7 +339,7 @@ function App(): JSX.Element {
 								botBubble: { showAvatar: true },
 								voice: { disabled: false },
 								sensitiveInput: { asterisksCount: 6 },
-								header: { title: "Bot", 
+								header: { title: "RO Chat-Bot", 
 									buttons: [Button.NOTIFICATION_BUTTON, Button.AUDIO_BUTTON, "reset-button", Button.CLOSE_CHAT_BUTTON], 
 									showResetChatButtonLabel: true, 
 									resetChatIcon: FiRefreshCw, 
