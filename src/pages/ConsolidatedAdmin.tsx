@@ -57,15 +57,43 @@ const ConsolidatedAdmin = () => {
 	const [isLoading, setIsLoading] = useState(false);
 	const fileInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
 
+	const [businessVertical, setBusinessVertical] = useState<string | null>(null);
+
 	useEffect(() => {
+		fetchBusinessVertical();
 		fetchConditions();
 	}, []);
 
+	const fetchBusinessVertical = async () => {
+		try {
+			const res = await http.get('/business-vertical');
+			setBusinessVertical(res.data.business_vertical);
+		} catch (err) {
+			console.error('Failed to fetch business vertical', err);
+		}
+	};
+
 	useEffect(() => {
-		if (selectedConditionId) {
+		if (businessVertical === 'Generic') {
+			fetchAllProducts();
+		} else if (businessVertical === 'RO' && selectedConditionId) {
 			fetchProducts(selectedConditionId);
 		}
-	}, [selectedConditionId]);
+	}, [selectedConditionId, businessVertical]);
+
+	const fetchAllProducts = async () => {
+		try {
+			setIsLoading(true);
+			const res = await http.get('/products/all');
+			setProducts(res.data);
+			setAttributes([]);
+			setSelectedProductId(null);
+		} catch (err) {
+			console.error('Failed to load products', err);
+		} finally {
+			setIsLoading(false);
+		}
+	};
 
 	const fetchConditions = async () => {
 		try {
@@ -395,16 +423,24 @@ const ConsolidatedAdmin = () => {
 				variant="contained"
 				startIcon={<AddIcon />}
 				onClick={() => table.setCreatingRow(true)}
-				disabled={!selectedConditionId}
+				disabled={businessVertical === 'RO' && !selectedConditionId}
 			>
 				Create New Product
 			</Button>
 		),
 		onCreatingRowSave: async ({ values, table }) => {
-			if (!selectedConditionId) return;
+			if (businessVertical === 'RO' && !selectedConditionId) return;
 			try {
-				await http.post('/products', { ...values, condition_id: selectedConditionId });
-				await fetchProducts(selectedConditionId);
+				const payload: any = { ...values };
+				if (businessVertical === 'RO') {
+					payload.condition_id = selectedConditionId;
+				}
+				await http.post('/products', payload);
+				if (businessVertical === 'RO' && selectedConditionId) {
+					await fetchProducts(selectedConditionId);
+				} else if (businessVertical === 'Generic') {
+					await fetchAllProducts();
+				}
 				table.setCreatingRow(null);
 			} catch (err) {
 				console.error('Failed to create product', err);
@@ -498,22 +534,24 @@ const ConsolidatedAdmin = () => {
 			<Box sx={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto' }}>
 				<Box sx={{ px: { xs: 2, sm: 3, md: 4 }, py: 2 }}>
 					{/* Conditions */}
-					<Paper elevation={3} sx={{ p: 3, mb: 2, background: theme.palette.background.paper }}>
-						<Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-							Water Conditions
-						</Typography>
-						<MaterialReactTable table={conditionTable} />
-					</Paper>
+					{businessVertical === 'RO' && (
+						<Paper elevation={3} sx={{ p: 3, mb: 2, background: theme.palette.background.paper }}>
+							<Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+								Water Conditions
+							</Typography>
+							<MaterialReactTable table={conditionTable} />
+						</Paper>
+					)}
 
-					{/* Products (only when a condition is selected) */}
-					{selectedConditionId && (
+					{/* Products */}
+					{(businessVertical === 'RO' && selectedConditionId) || businessVertical === 'Generic' ? (
 						<Paper elevation={3} sx={{ p: 3, mb: 2, background: theme.palette.background.paper }}>
 							<Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main' }}>
 								Products
 							</Typography>
 							<MaterialReactTable table={productTable} />
 						</Paper>
-					)}
+					) : null}
 
 					{/* Attributes (only when a product is selected) */}
 					{selectedProductId && (
