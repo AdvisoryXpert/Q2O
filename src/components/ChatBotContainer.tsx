@@ -17,7 +17,7 @@ import { useBotStatesContext } from "../context/BotStatesContext";
 import { useSettingsContext } from "../context/SettingsContext";
 import { useStylesContext } from "../context/StylesContext";
 import { Plugin } from "../types/Plugin";
-import { FaExpand, FaCompress } from 'react-icons/fa';
+//import { FaExpand, FaCompress } from 'react-icons/fa';
 
 import "./ChatBotContainer.css";
 
@@ -140,27 +140,9 @@ const ChatBotContainer = ({
         	}
 
 				<div style={getChatWindowStyle()} className="rcb-chat-window">
-					{settings.general?.showHeader && <ChatBotHeader buttons={headerButtons} />}
+					{settings.general?.showHeader && <ChatBotHeader buttons={headerButtons} isExpanded={isExpanded} toggleExpandChat={toggleExpandChat} />}
 
-					{/* Expand / Restore button beside bell icon (visually top-right) */}
-					<button
-						onClick={toggleExpandChat}
-						style={{
-        				position: 'absolute',
-        				top: '10px',    // align with header top
-        				right: '110px',  // adjust to be beside bell icon
-        				zIndex: 10001,
-        				background: 'none',
-        				border: 'none',
-        				fontSize: '20px',
-							fontWeight: 'bold',
-        				cursor: 'pointer',
-        				color: 'goldenrod,'  // match icon color if needed
-        			}}
-						aria-label="Expand or Restore Chatbot"
-        		>
-						{isExpanded ? <FaCompress /> : <FaExpand />}
-					</button>
+					
 
 					<ChatBotBody setChatScrollHeight={setChatScrollHeight} />
 					<ToastContainer />

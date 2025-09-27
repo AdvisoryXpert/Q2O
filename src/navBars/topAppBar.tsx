@@ -27,7 +27,7 @@ import { navIcons, type NavItem } from "./navIcons";
 import aquapotLogo from "../images/aquapot-logo-r.jpg";
 import { http } from "../lib/http";
 import { clearSessionCache, getUserName } from "../services/AuthService";
-import ChatWidget from "../App";
+import { default as ChatWidget } from "../App";
 
 const DRAWER_WIDTH_EXPANDED = 240;
 const DRAWER_WIDTH_COLLAPSED = 72;

@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 
 import {
+	createResetButton,
 	createAudioButton,
 	createCloseChatButton,
 	createEmojiButton,
@@ -22,6 +23,7 @@ export const useButtonInternal = () => {
 
 	// handles the rendering of buttons
 	const staticButtonComponentMap = useMemo(() => ({
+		[Button.RESET_BUTTON]: () => createResetButton(),
 		[Button.CLOSE_CHAT_BUTTON]: () => createCloseChatButton(),
 		[Button.AUDIO_BUTTON]: () => createAudioButton(),
 		[Button.NOTIFICATION_BUTTON]: () => createNotificationButton(),

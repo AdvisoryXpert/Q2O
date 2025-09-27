@@ -1,6 +1,6 @@
-/* Notification Icon */
+/* Reset Chat Icon */
 
-.rcb-notification-icon {
+.rcb-reset-chat-icon {
 	position: relative;
 	display: inline-block;
 	background-size: cover;
@@ -10,7 +10,7 @@
 	cursor: pointer;
 }
 
-.rcb-notification-icon::after {
+.rcb-reset-chat-icon::after {
 	content: "";
 	position: absolute;
 	top: 50%;
@@ -24,7 +24,7 @@
 	transition: width 0.2s ease-out, height 0.2s ease-out, opacity 0.2s ease-out;
 }
 
-.rcb-notification-icon:hover::after {
+.rcb-reset-chat-icon:hover::after {
 	width: 130%;
 	height: 130%;
 	opacity: 1;

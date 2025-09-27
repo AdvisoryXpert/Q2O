@@ -1,6 +1,12 @@
 import { useState, useRef, useEffect } from "react";
 import { getUserId } from "./services/AuthService";
 import { http } from './lib/http';
+import { Button } from "./constants/Button";
+import AudioIcon from "./assets/audio_icon.svg?react";
+import AudioIconDisabled from "./assets/audio_icon_disabled.svg?react";
+import botAvatar from "./assets/bot_avatar.svg";
+import CloseChatIcon from "./assets/close_chat_icon.svg?react";
+import { FiRefreshCw } from "react-icons/fi";
 import ChatBot from "./components/ChatBot";
 
 type DealerData = {
@@ -12,7 +18,7 @@ type DealerData = {
   account_type: string;
 }
 
-function App() {
+function App(): JSX.Element {
 	// Guard to mount ChatBot only once in React 18 StrictMode (dev)
 	const mountChatRef = useRef(false);
 	const [mountChat, setMountChat] = useState(false);
@@ -327,13 +333,20 @@ function App() {
 							id="chatbot-id"
 							flow={flow}
 							settings={{
-								audio: { disabled: false },
+								audio: { disabled: false, icon: AudioIcon, iconDisabled: AudioIconDisabled },
 								chatInput: { botDelay: 1000 },
 								userBubble: { showAvatar: true },
 								botBubble: { showAvatar: true },
 								voice: { disabled: false },
 								sensitiveInput: { asterisksCount: 6 },
-								header: { title: "RO Supplier Chennai" },
+								header: { title: "Bot", 
+									buttons: [Button.NOTIFICATION_BUTTON, Button.AUDIO_BUTTON, "reset-button", Button.CLOSE_CHAT_BUTTON], 
+									showResetChatButtonLabel: true, 
+									resetChatIcon: FiRefreshCw, 
+									closeChatIcon: CloseChatIcon,
+									showAvatar: true,
+									avatar: botAvatar
+								},
 							}}
 						/>
 					)}

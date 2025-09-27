@@ -1,3 +1,4 @@
+import ResetButton from "../components/Buttons/ResetButton/ResetButton";
 import FileAttachmentButton from "../components/Buttons/FileAttachmentButton/FileAttachmentButton";
 import EmojiButton from "../components/Buttons/EmojiButton/EmojiButton";
 import AudioButton from "../components/Buttons/AudioButton/AudioButton";
@@ -24,6 +25,7 @@ export const getButtonConfig = (
 	buttonComponentMap: {[x: string]: () => JSX.Element}
 ): ButtonConfig => {
 	const buttonDisabledMap = {
+		[Button.RESET_BUTTON]: false,
 		[Button.AUDIO_BUTTON]: settings.audio?.disabled,
 		[Button.CLOSE_CHAT_BUTTON]: settings.general?.embedded,
 		[Button.EMOJI_PICKER_BUTTON]: settings.emoji?.disabled,
@@ -75,6 +77,7 @@ export const getButtonConfig = (
 
 // functions below are self-explanatory (used to create the default button components)
 
+export const createResetButton = () => <ResetButton/>
 export const createAudioButton = () => <AudioButton/>
 export const createNotificationButton = () => <NotificationButton/>
 export const createCloseChatButton = () => <CloseChatButton/>

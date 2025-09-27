@@ -1,16 +1,21 @@
-import React, { Fragment } from "react";
+// Force re-evaluation
+import React from "react";
 
 import { useSettingsContext } from "../../context/SettingsContext";
 import { useStylesContext } from "../../context/StylesContext";
 
 import "./ChatBotHeader.css";
 
+import { FaExpand, FaCompress } from 'react-icons/fa';
+
 /**
  * Contains header buttons and avatar.
  * 
  * @param buttons list of buttons to render in the header
+ * @param isExpanded boolean to determine if chat is expanded
+ * @param toggleExpandChat function to toggle chat expansion
  */
-const ChatBotHeader = ({ buttons }: { buttons: JSX.Element[] }) => {
+const ChatBotHeader = ({ buttons, isExpanded, toggleExpandChat }: { buttons: JSX.Element[], isExpanded: boolean, toggleExpandChat: () => void }) => {
 	// handles settings
 	const { settings } = useSettingsContext();
 
@@ -36,8 +41,22 @@ const ChatBotHeader = ({ buttons }: { buttons: JSX.Element[] }) => {
 				{settings.header?.title}
 			</div>
 			<div className="rcb-chat-header">
+				<button
+					onClick={toggleExpandChat}
+					style={{
+						background: 'none',
+						border: 'none',
+						fontSize: '20px',
+						fontWeight: 'bold',
+						cursor: 'pointer',
+						color: 'white'
+					}}
+					aria-label="Expand or Restore Chatbot"
+				>
+					{isExpanded ? <FaCompress /> : <FaExpand />}
+				</button>
 				{buttons?.map((button: JSX.Element, index: number) => 
-					<Fragment key={index}>{button}</Fragment>
+					<div key={index} className="rcb-header-button">{button}</div>
 				)}
 			</div>
 		</div>
