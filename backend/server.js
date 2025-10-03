@@ -15,8 +15,16 @@ const http = require('http');
 const app = express();
 
 // ---- 2) CORS / parsers BEFORE auth ----
+const allowedOrigins = ['http://127.0.0.1:3000', 'https://127.0.0.1:3000', 'http://192.168.1.73:3000', 'https://192.168.31.42:5173', 'https://127.0.0.1:5173'];
+
 const corsOptions = {
-  origin: ['http://127.0.0.1:3000', 'https://127.0.0.1:3000', 'http://192.168.1.73:3000'],
+  origin: function (origin, callback) {
+    if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   allowedHeaders: ['Content-Type', 'Authorization', 'x-tenant-id'] // <— important for JWT header
 };
@@ -43,6 +51,10 @@ app.set('trust proxy', 1);
 // Static
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/uploads/lr-receipts', express.static(path.join(__dirname, 'uploads/lr-receipts')));
+
+// Whatsapp integration
+const whatsappRoutes = require("./routes/whatsapp");
+app.use("/api/whatsapp", whatsappRoutes);
 
 // DB ping
 db.getConnection((err, connection) => {
@@ -140,7 +152,7 @@ app.use('/api/product-pricing', productPricingRoutes);
 
 // Product Admin
 const productAdminRoutes = require('./routes/productAdminRoutes');
-app.use('/api', productAdminRoutes);
+app.use('/api', expressFileUpload(), require('./routes/productAdminRoutes'));
 
 // User / Role Mgmt
 const userAccessRoutes = require('./routes/user_role_Access');
@@ -235,7 +247,7 @@ app.use('/api', changePasswordRouter);
 
 // Simple /api/me probe (optional) — helps test token/tenant_id quickly
 app.get('/api/me', (req, res) => {
-  res.json({ ok: true, user: req.user, tenant_id: req.tenant_id });
+  res.json({ ok: true, user: req.user, tenant_id: req.tenant_id, token: req.token });
 });
 
 // ----- OLD UNPROTECTED ROUTES (MOVED) -----

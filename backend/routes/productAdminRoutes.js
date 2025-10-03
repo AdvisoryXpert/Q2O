@@ -3,6 +3,13 @@ const router = express.Router();
 const db = require('../db');
 const path = require('path');
 const fs = require('fs');
+const getBusinessVertical = require('../middleware/getBusinessVertical');
+
+router.use(getBusinessVertical);
+
+router.get('/business-vertical', (req, res) => {
+  res.json({ business_vertical: req.business_vertical });
+});
 
 /* =========================
    WATER CONDITION APIs
@@ -10,6 +17,9 @@ const fs = require('fs');
 
 // GET all conditions (tenant)
 router.get('/conditions', (req,res) => {
+  if (req.business_vertical === 'Generic') {
+    return res.json([]);
+  }
   db.query('SELECT * FROM ro_cpq.water_condition WHERE tenant_id = ?', [req.tenant_id], (err, results) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(results);
@@ -22,6 +32,9 @@ router.get('/ping', (req, res) => {
 
 // POST new condition (stamp tenant)
 router.post('/conditions', (req, res) => {
+  if (req.business_vertical === 'Generic') {
+    return res.status(403).json({ message: 'Water conditions are not supported for this tenant' });
+  }
   const { tds_min, tds_max, hardness_min, hardness_max } = req.body;
   db.query(
     `INSERT INTO ro_cpq.water_condition (tenant_id, tds_min, tds_max, hardness_min, hardness_max)
@@ -36,6 +49,9 @@ router.post('/conditions', (req, res) => {
 
 // PUT update condition (guard by tenant)
 router.put('/conditions/:id', (req, res) => {
+  if (req.business_vertical === 'Generic') {
+    return res.status(403).json({ message: 'Water conditions are not supported for this tenant' });
+  }
   const { id } = req.params;
   const { tds_min, tds_max, hardness_min, hardness_max } = req.body;
   db.query(
@@ -52,6 +68,9 @@ router.put('/conditions/:id', (req, res) => {
 
 // DELETE condition (guard by tenant)
 router.delete('/conditions/:id', (req, res) => {
+  if (req.business_vertical === 'Generic') {
+    return res.status(403).json({ message: 'Water conditions are not supported for this tenant' });
+  }
   db.query('DELETE FROM ro_cpq.water_condition WHERE condition_id = ? AND tenant_id = ?',
     [req.params.id, req.tenant_id],
     (err) => {
@@ -67,7 +86,10 @@ router.delete('/conditions/:id', (req, res) => {
 
 // POST new product (stamp tenant)
 router.post('/products', (req, res) => {
-  const { name, condition_id } = req.body;
+  let { name, condition_id } = req.body;
+  if (req.business_vertical === 'Generic') {
+    condition_id = null;
+  }
   db.query(
     `INSERT INTO ro_cpq.product (tenant_id, name, condition_id) VALUES (?, ?, ?)`,
     [req.tenant_id, name, condition_id],
@@ -81,7 +103,10 @@ router.post('/products', (req, res) => {
 // PUT update product (guard by tenant)
 router.put('/products/:id', (req, res) => {
   const { id } = req.params;
-  const { name, condition_id } = req.body;
+  let { name, condition_id } = req.body;
+  if (req.business_vertical === 'Generic') {
+    condition_id = null;
+  }
   db.query(
     `UPDATE ro_cpq.product SET name = ?, condition_id = ?
      WHERE product_id = ? AND tenant_id = ?`,
@@ -149,6 +174,17 @@ router.delete('/product-attributes/:id', (req, res) => {
   );
 });
 
+router.get('/products/all', (req, res) => {
+  db.query(
+    'SELECT * FROM ro_cpq.product WHERE tenant_id = ?',
+    [req.tenant_id],
+    (err, results) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json(results);
+    }
+  );
+});
+
 // Get products by condition_id (tenant)
 router.get('/products', (req, res) => {
   const { condition_id } = req.query;
@@ -200,7 +236,7 @@ router.post('/product-attributes/:id/upload-image', (req, res) => {
       if (err) return res.status(500).json({ error: err.message });
       if (results.length === 0) return res.status(404).send('Product not found');
 
-      const productName = results[0].name;
+      const productName = results[0].name.replace(/\s/g, "_");
       const conditionId = results[0].condition_id;
       const dir = path.join(__dirname, `../uploads/product_attribute/${productName}_${conditionId}`);
 
@@ -209,7 +245,7 @@ router.post('/product-attributes/:id/upload-image', (req, res) => {
       }
 
       const imagePath = path.join(dir, `${Date.now()}_${imageFile.name}`);
-      const imageUrl = `/${path.relative(path.join(__dirname, '../'), imagePath)}`;
+      const imageUrl = `/${path.relative(path.join(__dirname, '../'), imagePath)}`.replace(/\\/g, "/");
 
       imageFile.mv(imagePath, (err) => {
         if (err) return res.status(500).send(err);
@@ -248,7 +284,7 @@ router.post('/product-attributes/:id/upload-specification', (req, res) => {
       if (err) return res.status(500).json({ error: err.message });
       if (results.length === 0) return res.status(404).send('Product not found');
 
-      const productName = results[0].name;
+      const productName = results[0].name.replace(/\s/g, "_");
       const conditionId = results[0].condition_id;
       const dir = path.join(__dirname, `../uploads/product_attribute/${productName}_${conditionId}`);
 
@@ -257,7 +293,7 @@ router.post('/product-attributes/:id/upload-specification', (req, res) => {
       }
 
       const specificationPath = path.join(dir, `${Date.now()}_${specificationFile.name}`);
-      const specificationUrl = `/${path.relative(path.join(__dirname, '../'), specificationPath)}`;
+      const specificationUrl = `/${path.relative(path.join(__dirname, '../'), specificationPath)}`.replace(/\\/g, "/");
 
       specificationFile.mv(specificationPath, (err) => {
         if (err) return res.status(500).send(err);
