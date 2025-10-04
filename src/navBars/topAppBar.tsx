@@ -24,7 +24,6 @@ import LogoutIcon from "@mui/icons-material/Logout";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import { navIcons, type NavItem } from "./navIcons";
-import aquapotLogo from "../images/aquapot-logo-r.jpg";
 import { http } from "../lib/http";
 import { clearSessionCache, getUserName } from "../services/AuthService";
 import { default as ChatWidget } from "../App";
@@ -32,11 +31,14 @@ import { default as ChatWidget } from "../App";
 const DRAWER_WIDTH_EXPANDED = 240;
 const DRAWER_WIDTH_COLLAPSED = 72;
 
+
+
 const TopAppBar: React.FC = () => {
 	const theme = useTheme();
 	const mdDown = useMediaQuery(theme.breakpoints.down("md"));
 	const [open, setOpen] = useState<boolean>(!mdDown);
 	const [userName, setUserName] = useState<string | null>(null);
+	
 
 	const navigate = useNavigate();
 	const location = useLocation();
@@ -51,8 +53,10 @@ const TopAppBar: React.FC = () => {
 	useEffect(() => setOpen(!mdDown), [mdDown]);
 
 	useEffect(() => {
-		(async () => setUserName(await getUserName()))();
-	}, []);
+		(async () => {
+			setUserName(await getUserName());
+		})();
+	}, [location.pathname]);
 
 	const handleLogout = async () => {
 		try { await http.post("/logout"); } catch {}
@@ -84,12 +88,7 @@ const TopAppBar: React.FC = () => {
 					<IconButton onClick={toggle} aria-label="Toggle navigation">
 						{open ? <MenuOpenIcon sx={{ color: 'white' }} /> : <MenuIcon sx={{ color: 'white' }} />}
 					</IconButton>
-					{(!mdDown && open) || mdDown ? (
-						<Box sx={{ display: "flex", alignItems: "center", gap: 1, fontWeight: 600 }}>
-							<img src={aquapotLogo} alt="Aquapot" style={{ height: 28, borderRadius: 6 }} />
-							Aquapot
-						</Box>
-					) : null}
+					
 				</Toolbar>
 
 				<Divider />

@@ -1,10 +1,12 @@
 // node backend/server.js
-require('dotenv').config({ path: '../.env' }); // 1) load env ASAP
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
+
+//console.log('VITE_BACKEND_URL:', process.env.VITE_BACKEND_URL); // Debugging line
 
 const express = require('express');
 const cors = require('cors');
 const db = require('./db');
-const path = require('path');
 //const session = require('express-session');
 const cookieParser = require('cookie-parser');
 const verifyToken = require('./middleware/auth'); // JWT verify (sets req.user and req.tenant_id)
@@ -87,6 +89,9 @@ app.use('/api/invitations', invitationsPublicRouter);
 
 // ------------- 4) PROTECT EVERYTHING ELSE UNDER /api -------------
 app.use('/api', verifyToken);
+
+const tenantRouter = require('./routes/tenant');
+app.use('/api', tenantRouter);
 
 // Activity logger AFTER auth so it can log req.user/req.tenant_id
 const activityLogger = require('./middleware/activityLogger')(db);
@@ -241,7 +246,7 @@ app.get('/api/quotation-items/:quote_id', (req, res) => {
 const quotesByPhoneRouter = require('./routes/quotesByPhone')(db);
 app.use('/api/quotes', quotesByPhoneRouter);
 
-// Change Password (already under /api)
+// Change Password (already under /.env
 const changePasswordRouter = require('./routes/changePassword');
 app.use('/api', changePasswordRouter);
 
@@ -279,8 +284,7 @@ app.post('/api/dealer-quotation', (req, res) => {
 
   function checkOrCreateDealer(callback) {
     const checkDealerSQL = `
-      SELECT dealer_id FROM ro_cpq.dealer 
-      WHERE phone = ? AND tenant_id = ?
+      SELECT dealer_.env      WHERE phone = ? AND tenant_id = ?
     `;
     db.query(checkDealerSQL, [phone, req.tenant_id], (err, existing) => {
       if (err) return callback(new Error("Dealer lookup failed"));
@@ -417,7 +421,7 @@ const USE_HTTPS = (process.env.USE_HTTPS || 'true') === 'true';
 console.log('Registered routes:');
 app._router.stack.forEach(function(r){
   if (r.route && r.route.path){
-    console.log(Object.keys(r.route.methods).join(', ').toUpperCase() + '\t' + r.route.path);
+    console.log(Object.keys(r.route.methods).join(', ').toUpperCase() + '	' + r.route.path);
   }
 });
 if (USE_HTTPS) {

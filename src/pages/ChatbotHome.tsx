@@ -20,6 +20,7 @@ import RecentQuotes from "../components/Dashboard/RecentQuotes";
 import OrdersOverview from "../components/Dashboard/OrdersOverview";
 import { useNavigate } from "react-router-dom";
 import DealerFollowUps from "../components/Dashboard/DealerFollowUps";
+import TenantDisplay from "../components/TenantDisplay";
 
 const ChatbotHome: React.FC = () => {
 	const theme = useTheme();
@@ -46,9 +47,7 @@ const ChatbotHome: React.FC = () => {
 				<Container maxWidth="xl">
 					<Grid container spacing={2} alignItems="center">
 						<Grid item xs={12} md={4}>
-							<Typography variant="h5" fontWeight={800}>
-								Welcome back!
-							</Typography>
+							<TenantDisplay />
 							<Typography variant="body2" color="text.secondary">
 								Quotes, reminders, and orders at a glance.
 							</Typography>
