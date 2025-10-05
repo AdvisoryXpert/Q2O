@@ -284,7 +284,8 @@ app.post('/api/dealer-quotation', (req, res) => {
 
   function checkOrCreateDealer(callback) {
     const checkDealerSQL = `
-      SELECT dealer_.env      WHERE phone = ? AND tenant_id = ?
+            SELECT dealer_id FROM ro_cpq.dealer 
+      WHERE phone = ? AND tenant_id = ?
     `;
     db.query(checkDealerSQL, [phone, req.tenant_id], (err, existing) => {
       if (err) return callback(new Error("Dealer lookup failed"));
