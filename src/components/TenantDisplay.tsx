@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from "react";
-import { Box, Typography, Avatar } from "@mui/material";
+import { Box, Typography, Avatar, Divider } from "@mui/material";
 import { http } from "../lib/http";
 
 type Tenant = {
@@ -15,8 +15,6 @@ const TenantDisplay: React.FC = () => {
 		(async () => {
 			try {
 				const response = await http.get("/tenant");
-				console.log("Full response from /tenant:", response);
-
 				if (typeof response.data === 'object' && response.data !== null) {
 					setTenant(response.data);
 				} else {
@@ -35,11 +33,47 @@ const TenantDisplay: React.FC = () => {
 	const logoUrl = tenant.logo_url;
 
 	return (
-		<Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2 }}>
-			<Avatar src={logoUrl} alt={tenant.name} sx={{ width: 56, height: 56 }} />
-			<Typography variant="h4" component="h1" sx={{ fontWeight: "bold" }}>
-				{tenant.name}
-			</Typography>
+		<Box sx={{ width: "100%", mb: 2 }}>
+			<Box
+				sx={{
+					display: "flex",
+					alignItems: "center",
+					gap: 3,
+					p: 2,
+					width: "100%",
+				}}
+			>
+				<Avatar
+					src={logoUrl}
+					alt={tenant.name}
+					variant="rounded"
+					sx={{
+						width: 120,
+						height: 120,
+						border: "4px solid rgba(255, 255, 255, 0.5)",
+						boxShadow: "0 8px 24px rgba(0,0,0,0.2)",
+						"& .MuiAvatar-img": {
+							objectFit: "contain",
+						},
+					}}
+				/>
+				<Box>
+					<Typography
+						variant="h2"
+						component="h1"
+						sx={{
+							fontWeight: 700,
+							color: "text.primary",
+						}}
+					>
+						{tenant.name}
+					</Typography>
+					<Typography variant="h5" color="text.secondary">
+						Welcome
+					</Typography>
+				</Box>
+			</Box>
+			<Divider sx={{ mt: 2 }} />
 		</Box>
 	);
 };
