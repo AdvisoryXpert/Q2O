@@ -15,8 +15,8 @@ import {
 import SearchIcon from "@mui/icons-material/Search";
 import NotificationsActiveIcon from "@mui/icons-material/NotificationsActive";
 import ReminderSection from "../components/reminders";
-import GoogleAds from "../components/Dashboard/GoogleAds";
-import RecentQuotes from "../components/Dashboard/RecentQuotes";
+//import GoogleAds from "../components/Dashboard/GoogleAds";
+//import RecentQuotes from "../components/Dashboard/RecentQuotes";
 import OrdersOverview from "../components/Dashboard/OrdersOverview";
 import { useNavigate } from "react-router-dom";
 import DealerFollowUps from "../components/Dashboard/DealerFollowUps";
@@ -52,50 +52,53 @@ const ChatbotHome: React.FC = () => {
 								Quotes, reminders, and orders at a glance.
 							</Typography>
 						</Grid>
-
-						<Grid item xs={12} md={8}>
-							<Paper
-								elevation={0}
-								sx={{
-									p: 1,
-									borderRadius: 2,
-									border: `1px solid ${theme.palette.divider}`,
-									bgcolor: "background.paper",
-								}}
-							>
-								<Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-									<TextField
-										fullWidth
-										size="medium"
-										placeholder="Search by serial number (components)"
-										value={serialNumber}
-										onChange={(e) => setSerialNumber(e.target.value)}
-										onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-										InputProps={{
-											startAdornment: (
-												<InputAdornment position="start">
-													<SearchIcon />
-												</InputAdornment>
-											),
-										}}
-									/>
-									<Button
-										variant="contained"
-										size="large"
-										sx={{ px: 3, fontWeight: 700, whiteSpace: "nowrap" }}
-										onClick={handleSearch}
-									>
-										Search
-									</Button>
-									{/* Removed the “New Quotation” button as requested */}
-								</Stack>
-							</Paper>
-						</Grid>
 					</Grid>
 				</Container>
 			</Box>
 
 			{/* Main content */}
+			<Container maxWidth="xl" sx={{ py: 2 }}>
+				<Grid container spacing={2} justifyContent="center">
+					<Grid item xs={12} md={8}>
+						<Paper
+							elevation={0}
+							sx={{
+								p: 1,
+								borderRadius: 2,
+								border: `1px solid ${theme.palette.divider}`,
+								bgcolor: "background.paper",
+							}}
+						>
+							<Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+								<TextField
+									fullWidth
+									size="medium"
+									placeholder="Search by serial number (components)"
+									value={serialNumber}
+									onChange={(e) => setSerialNumber(e.target.value)}
+									onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+									InputProps={{
+										startAdornment: (
+											<InputAdornment position="start">
+												<SearchIcon />
+											</InputAdornment>
+										),
+									}}
+								/>
+								<Button
+									variant="contained"
+									size="large"
+									sx={{ px: 3, fontWeight: 700, whiteSpace: "nowrap" }}
+									onClick={handleSearch}
+								>
+									Search
+								</Button>
+								{/* Removed the “New Quotation” button as requested */}
+							</Stack>
+						</Paper>
+					</Grid>					
+				</Grid>
+			</Container>
 			<Container maxWidth="xl" sx={{ py: 2 }}>
 				<Grid container spacing={2}>
 					{/* First Row */}
@@ -140,12 +143,12 @@ const ChatbotHome: React.FC = () => {
 				</Grid>
 				<Grid container spacing={2} sx={{ mt: 2 }}>
 					{/* Second Row */}
-					<Grid item xs={12}>
+					{/* <Grid item xs={12}>
 						<RecentQuotes limit={10} />
-					</Grid>
-					<Grid item xs={12}>
+					</Grid> */}
+					{/* <Grid item xs={12}>
 						<GoogleAds />
-					</Grid>
+					</Grid> */}
 				</Grid>
 			</Container>
 
