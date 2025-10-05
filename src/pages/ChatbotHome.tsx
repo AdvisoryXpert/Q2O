@@ -58,48 +58,6 @@ const ChatbotHome: React.FC = () => {
 
 			{/* Main content */}
 			<Container maxWidth="xl" sx={{ py: 2 }}>
-				<Grid container spacing={2} justifyContent="center">
-					<Grid item xs={12} md={8}>
-						<Paper
-							elevation={0}
-							sx={{
-								p: 1,
-								borderRadius: 2,
-								border: `1px solid ${theme.palette.divider}`,
-								bgcolor: "background.paper",
-							}}
-						>
-							<Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-								<TextField
-									fullWidth
-									size="medium"
-									placeholder="Search by serial number (components)"
-									value={serialNumber}
-									onChange={(e) => setSerialNumber(e.target.value)}
-									onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-									InputProps={{
-										startAdornment: (
-											<InputAdornment position="start">
-												<SearchIcon />
-											</InputAdornment>
-										),
-									}}
-								/>
-								<Button
-									variant="contained"
-									size="large"
-									sx={{ px: 3, fontWeight: 700, whiteSpace: "nowrap" }}
-									onClick={handleSearch}
-								>
-									Search
-								</Button>
-								{/* Removed the “New Quotation” button as requested */}
-							</Stack>
-						</Paper>
-					</Grid>					
-				</Grid>
-			</Container>
-			<Container maxWidth="xl" sx={{ py: 2 }}>
 				<Grid container spacing={2}>
 					{/* First Row */}
 					<Grid item xs={12} md={4} sx={{ minWidth: 0 }}>
@@ -134,8 +92,48 @@ const ChatbotHome: React.FC = () => {
 							</Box>
 						</Paper>
 					</Grid>
-					<Grid item xs={12} md={4} sx={{ minWidth: 0 }}>
-						<OrdersOverview />
+					<Grid item xs={12} md={4} sx={{ minWidth: 0 }}>						
+						<Grid item xs={12} sx={{mt: 0}}>
+							<Paper
+								elevation={0}
+								sx={{
+									p: 1,
+									borderRadius: 2,
+									border: `1px solid ${theme.palette.divider}`,
+									bgcolor: "background.paper",
+								}}
+							>
+								<Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+									<TextField
+										fullWidth
+										size="medium"
+										placeholder="Search by serial number (components)"
+										value={serialNumber}
+										onChange={(e) => setSerialNumber(e.target.value)}
+										onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+										InputProps={{
+											startAdornment: (
+												<InputAdornment position="start">
+													<SearchIcon />
+												</InputAdornment>
+											),
+										}}
+									/>
+									<Button
+										variant="contained"
+										size="large"
+										sx={{ px: 3, fontWeight: 700, whiteSpace: "nowrap" }}
+										onClick={handleSearch}
+									>
+										Search
+									</Button>
+									{/* Removed the “New Quotation” button as requested */}
+								</Stack>
+							</Paper>
+						</Grid>
+						<Grid item xs={12} sx={{mt: 2}}>
+							<OrdersOverview />
+						</Grid>
 					</Grid>
 					<Grid item xs={12} md={4} sx={{ minWidth: 0 }}>
 						<DealerFollowUps />

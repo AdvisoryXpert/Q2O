@@ -17,7 +17,7 @@ const http = require('http');
 const app = express();
 
 // ---- 2) CORS / parsers BEFORE auth ----
-const allowedOrigins = ['http://127.0.0.1:3000', 'https://127.0.0.1:3000', 'http://192.168.1.73:3000', 'https://192.168.31.42:5173', 'https://127.0.0.1:5173'];
+const allowedOrigins = ['http://127.0.0.1:3000', 'https://127.0.0.1:3000', 'http://192.168.1.73:3000', 'http://192.168.1.3:3000', 'https://192.168.31.42:5173', 'https://192.168.1.3:5173','https://127.0.0.1:5173'];
 
 const corsOptions = {
   origin: function (origin, callback) {

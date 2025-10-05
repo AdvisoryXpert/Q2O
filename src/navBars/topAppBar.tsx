@@ -22,7 +22,8 @@ import MenuIcon from "@mui/icons-material/Menu";
 import MenuOpenIcon from "@mui/icons-material/MenuOpen";
 import LogoutIcon from "@mui/icons-material/Logout";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
-import { useNavigate, useLocation, Outlet } from "react-router-dom";
+import { Link, useNavigate, useLocation, Outlet } from "react-router-dom";
+import qorzaLogo from "../../assets/Qorza.png";
 import { navIcons, type NavItem } from "./navIcons";
 import { http } from "../lib/http";
 import { clearSessionCache, getUserName } from "../services/AuthService";
@@ -84,6 +85,17 @@ const TopAppBar: React.FC = () => {
 					height: "100%",
 				}}
 			>
+				{open && (
+					<Box sx={{ p: 2, textAlign: 'center' }}>
+						<Link to="/">
+							<img
+								src={qorzaLogo}
+								alt="Quotation to Order"
+								style={{ width: '70%', borderRadius: '8px' }}
+							/>
+						</Link>
+					</Box>
+				)}
 				<Toolbar sx={{ minHeight: 64, px: 1.5, gap: 1 }}>
 					<IconButton onClick={toggle} aria-label="Toggle navigation">
 						{open ? <MenuOpenIcon sx={{ color: 'white' }} /> : <MenuIcon sx={{ color: 'white' }} />}
@@ -206,6 +218,7 @@ const TopAppBar: React.FC = () => {
 				>
 					{drawerContent}
 				</Drawer>
+
 			) : (
 				<Drawer
 					variant="permanent"

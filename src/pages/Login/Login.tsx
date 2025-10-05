@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 import "./Login.css";
 import { http } from "../../lib/http";
-import logo from "../../../assets/QuoteToOrder.png";
+import logo from "../../../assets/Qorza.png";
 import banner from "../../../assets/Whisk_cf2e3ae24d.jpg";
 
 // ⬇️ NEW: in-memory auth bus (no localStorage user)

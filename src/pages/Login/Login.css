@@ -33,8 +33,9 @@
 }
 
 .logo-image {
-    max-width: 200px;
+    max-width: 300px;
     margin-bottom: 20px;
+    text-align: center;
 }
 
 .login-title {
