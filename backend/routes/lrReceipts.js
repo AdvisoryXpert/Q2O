@@ -30,7 +30,7 @@ module.exports = function (db) {
           return res.status(500).json({ error: 'Insert failed' });
         }
         // ✅ Create follow-up for the LR record
-        createFollowup('lr', result.insertId, user_id, user_id, null, null, tenant_id);
+        createFollowup(tenant_id, 'lr', result.insertId, user_id, user_id);
         res.json({ id: result.insertId });
       }
     );

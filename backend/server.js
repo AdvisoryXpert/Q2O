@@ -405,7 +405,7 @@ app.post('/api/dealer-quotation', (req, res) => {
             return res.status(500).json({ error: err.message, quote_id });
           }
           const createFollowup = require('./routes/CreateFollowup');
-          createFollowup('quote', quote_id, req.user.id, req.user.id);
+          createFollowup(req.tenant_id, 'quote', quote_id, req.user.id, req.user.id);
           return res.json({ message: "Dealer, Quotation, and All Quotation Items created", quote_id });
         });
       });

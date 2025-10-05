@@ -42,7 +42,7 @@ router.post('/', (req, res) => {
 
     // optional follow-up creation (errors here shouldn't block the response)
     try {
-      createFollowup('sr', result.insertId, user_id, user_id, null, null, tenant_id);
+      createFollowup(tenant_id, 'sr', result.insertId, user_id, user_id);
     } catch (_) {}
 
     res.status(201).json({ message: 'Request created', id: result.insertId });
