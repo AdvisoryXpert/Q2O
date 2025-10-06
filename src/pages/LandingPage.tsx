@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import GetInTouchPopup from '../components/GetInTouchPopup';
+import qorzaLogo from '../../assets/Qorza.png';
 
 const LandingPage = () => {
 	const [showPopup, setShowPopup] = useState(false);
@@ -87,7 +88,7 @@ const LandingPage = () => {
 					padding: 1rem 0;
 				}
 				.hero {
-					background-color: var(--light-gray);
+					background-color: #fff;
 					padding: 6rem 0;
 					text-align: center;
 				}
@@ -199,6 +200,7 @@ const LandingPage = () => {
 			{/* Hero Section */}
 			<header className="hero" data-aos="fade-in">
 				<div className="container">
+					<img src={qorzaLogo} alt="Qorza Logo" style={{ height: '200px', marginBottom: '2rem' }} data-aos="fade-up" />
 					<h1 className="display-4" data-aos="fade-up">From Quote to Cash, 
 						Faster Than Ever</h1>
 					<p className="lead" data-aos="fade-up" data-aos-delay="200">
