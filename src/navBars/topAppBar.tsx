@@ -155,7 +155,7 @@ const TopAppBar: React.FC = () => {
 					{open ? (
 						<Box sx={{ flex: 1, minWidth: 0 }}>
 							<Typography noWrap variant="body2" sx={{ fontWeight: 600 }}>
-								{userName ? `Hello, ${userName}` : "Welcome"}
+								{userName ? `Welcome, ${userName}` : "Welcome"}
 							</Typography>
 							<Button onClick={handleLogout} startIcon={<LogoutIcon sx={{ color: 'white' }} />} size="small" sx={{ mt: 0.5, textTransform: "none", color: "white" }}>
 								Logout

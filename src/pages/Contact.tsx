@@ -7,7 +7,6 @@ import {
 	Card,
 	CardContent,
 	Chip,
-	Container,
 	Dialog,
 	DialogActions,
 	DialogContent,
@@ -48,7 +47,6 @@ import AddIcon from "@mui/icons-material/Add";
 import FilterListIcon from "@mui/icons-material/FilterList";
 import { http } from "../lib/http";
 import QuotationPage from "./QuotationPage";
-import TenantDisplay from "../components/TenantDisplay";
 
 /** Types */
 type Dealer = {
@@ -459,26 +457,13 @@ export default function Contact() {
 
 	return (
 		<>
-			{/* Header */}
-			<Box
-				sx={{
-					py: 0,
-					background:
-            "linear-gradient(90deg, rgba(0,82,204,0.12) 0%, rgba(2,132,199,0.12) 100%)",
-					borderBottom: `1px solid ${theme.palette.divider}`,
-				}}
-			>
-				<Container maxWidth="xl">
-					<Grid container spacing={2} alignItems="center">
-						<Grid item xs={12} md={12}>
-							<TenantDisplay />
-						</Grid>
-					</Grid>
-				</Container>
-			</Box>
 			<Paper
 				sx={{
-					margin: 2,
+					position: "fixed",
+					left: isMobile ? 0 : "var(--app-drawer-width, 240px)",
+					top: "var(--app-header-height, 56px)",
+					right: 0,
+					bottom: 0,
 					display: "flex",
 					flexDirection: "column",
 					borderRadius: 2,

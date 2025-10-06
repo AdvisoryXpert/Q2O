@@ -34,11 +34,11 @@ const ChatbotHome: React.FC = () => {
 	};
 
 	return (
-		<Box sx={{ minHeight: "10vh", bgcolor: "background.default" }}>
+		<Box sx={{ minHeight: "100vh", bgcolor: "background.default" }}>
 			{/* Header */}
 			<Box
 				sx={{
-					py: 0,
+					py: { xs: 2, md: 3 },
 					background:
             "linear-gradient(90deg, rgba(0,82,204,0.12) 0%, rgba(2,132,199,0.12) 100%)",
 					borderBottom: `1px solid ${theme.palette.divider}`,
@@ -48,8 +48,11 @@ const ChatbotHome: React.FC = () => {
 					<Grid container spacing={2} alignItems="center">
 						<Grid item xs={12} md={12}>
 							<TenantDisplay />
+							<Typography variant="body2" color="text.secondary">
+								Quotes, reminders, and orders at a glance.
+							</Typography>
 						</Grid>
-					</Grid>					
+					</Grid>
 				</Container>
 			</Box>
 
