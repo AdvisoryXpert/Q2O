@@ -17,7 +17,7 @@ import {
 import ErrorIcon from '@mui/icons-material/Error';
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import Bot from "../App";
+
 import TopAppBar from "../navBars/topAppBar";
 import { useNavAccess } from "../navBars/navBars";
 import { http } from "../lib/http";
@@ -797,7 +797,7 @@ const QuotationItems = () => {
 				<Alert severity="error">{snackbar.message}</Alert>
 			</Snackbar>
 
-			<Bot />
+			
 		</Box>
 	);
 };

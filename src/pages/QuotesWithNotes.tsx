@@ -8,7 +8,7 @@ import {
 } from '@mui/material';
 import { MaterialReactTable, type MRT_ColumnDef } from 'material-react-table';
 import TopAppBar from '../navBars/topAppBar';
-import Bot from '../App';
+
 import { useNavAccess } from '../navBars/navBars';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
@@ -157,7 +157,7 @@ const QuotesWithNotes: React.FC = () => {
 					</Paper>
 				)}
 			</Box>
-			<Bot />
+			
 		</>
 	);
 };
