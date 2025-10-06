@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
 	AppBar,
 	Box,
@@ -15,16 +15,15 @@ import {
 	useTheme,
 	Snackbar,
 	Alert,
+	Divider,
 } from "@mui/material";
-import {
-	DataGrid,
-	GridColDef,
-} from "@mui/x-data-grid";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import { useParams, useNavigate } from "react-router-dom";
 import { http } from "../lib/http";
-import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import { getUserId } from "../services/AuthService";
+import { BarcodeScanner, CameraOCRScanner } from "../utils/scanner_ocr";
 
-/** Types */
+/** Types (aligns new data with dispatch needs) */
 type Order = {
   order_id: number;
   customer_name: string;
@@ -38,9 +37,19 @@ type Order = {
 type OrderLineItem = {
   order_line_id: number;
   product_id: number;
+  product_attribute_id?: number; // optional (old had this)
+  product_name?: string;         // optional (new API may not send)
+  component_name?: string;       // optional (old UI field)
   quantity: number;
   unit_price: number;
   total_price: number;
+};
+
+type DispatchItem = OrderLineItem & {
+  dealer_id: number;
+  dealer_name: string;
+  serial_number: string;
+  customer_name: string; // for warranty payload (old used dealer_name here)
 };
 
 type OrderForm = {
@@ -48,7 +57,7 @@ type OrderForm = {
   status: string;
 };
 
-/** API helpers */
+/** API helpers - keep new fetch style */
 async function fetchOrder(orderId: string): Promise<Order> {
 	const { data } = await http.get(`/orders/${orderId}`);
 	return data;
@@ -69,37 +78,54 @@ export default function OrderDetailPage() {
 	const { orderId } = useParams<{ orderId: string }>();
 	const navigate = useNavigate();
 
+	/** Page state */
 	const [order, setOrder] = useState<Order | null>(null);
-	const [lineItems, setLineItems] = useState<OrderLineItem[]>([]);
+	const [dispatchItems, setDispatchItems] = useState<DispatchItem[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 
-	// form state
+	/** Form state (left panel) */
 	const [form, setForm] = useState<OrderForm>({ invoice_id: "", status: "" });
 	const [saving, setSaving] = useState(false);
+	const [dispatching, setDispatching] = useState(false);
 
-	// snack
+	/** Snack */
 	const [snack, setSnack] = useState<{ open: boolean; msg: string; type: "success" | "error" }>({
 		open: false,
 		msg: "",
 		type: "success",
 	});
 
+	/** Scanners */
+	const [scanningIndex, setScanningIndex] = useState<number | null>(null);
+	const [ocrCameraIndex, setOcrCameraIndex] = useState<number | null>(null);
+
+	/** Load order + items */
 	useEffect(() => {
 		if (!orderId) return;
 		(async () => {
 			try {
 				setLoading(true);
-				const [orderData, itemsData] = await Promise.all([
+				const [orderData, items] = await Promise.all([
 					fetchOrder(orderId),
 					fetchOrderLineItems(orderId),
 				]);
+
 				setOrder(orderData);
-				setLineItems(itemsData);
 				setForm({
 					invoice_id: orderData.invoice_id || "",
 					status: orderData.status,
 				});
+
+				// Map to DispatchItem shape, seed serials as empty
+				const mapped: DispatchItem[] = (items || []).map((it) => ({
+					...it,
+					dealer_id: orderData.dealer_id,
+					dealer_name: orderData.dealer_name,
+					customer_name: orderData.dealer_name, // old UI used dealer name here
+					serial_number: "",
+				}));
+				setDispatchItems(mapped);
 				setError(null);
 			} catch {
 				setError("Failed to load order details.");
@@ -110,18 +136,21 @@ export default function OrderDetailPage() {
 	}, [orderId]);
 
 	/** Handlers */
+	const onSerialChange = (index: number, value: string) => {
+		setDispatchItems((prev) => {
+			const next = [...prev];
+			next[index] = { ...next[index], serial_number: value };
+			return next;
+		});
+	};
+
 	const handleSave = async () => {
 		if (!orderId || !order) return;
-
 		setSaving(true);
 		try {
 			const payload: Partial<OrderForm> = {};
-			if (form.invoice_id !== (order.invoice_id || "")) {
-				payload.invoice_id = form.invoice_id;
-			}
-			if (form.status !== order.status) {
-				payload.status = form.status;
-			}
+			if (form.invoice_id !== (order.invoice_id || "")) payload.invoice_id = form.invoice_id;
+			if (form.status !== order.status) payload.status = form.status;
 
 			if (Object.keys(payload).length > 0) {
 				await updateOrder(orderId, payload);
@@ -131,34 +160,52 @@ export default function OrderDetailPage() {
 				setSnack({ open: true, msg: "No changes to save.", type: "success" });
 			}
 		} catch (e: any) {
-			setSnack({ open: true, msg: e?.response?.data?.message || "Failed to update order.", type: "error" });
+			setSnack({
+				open: true,
+				msg: e?.response?.data?.message || "Failed to update order.",
+				type: "error",
+			});
 		} finally {
 			setSaving(false);
 		}
 	};
 
-	/** DataGrid columns */
-	const columns: GridColDef[] = [
-		{ field: "order_line_id", headerName: "Line ID", flex: 0.5, minWidth: 100 },
-		{ field: "product_id", headerName: "Product ID", flex: 1, minWidth: 150 },
-		{ field: "quantity", headerName: "Quantity", flex: 0.5, minWidth: 100 },
-		{ field: "unit_price", headerName: "Unit Price", flex: 0.7, minWidth: 120, valueFormatter: (params) => `₹${params.value}` },
-		{ field: "total_price", headerName: "Total Price", flex: 0.7, minWidth: 120, valueFormatter: (params) => `₹${params.value}` },
-	];
+	const handleSaveAndDispatch = async () => {
+		if (!orderId) return;
+		setDispatching(true);
+		try {
+			const userId = (await getUserId()) || "1";
 
-	const gridRows = useMemo(() => lineItems.map((item) => ({ id: item.order_line_id, ...item })), [lineItems]);
+			// Build minimal payload expected by warranty endpoint
+			const payload = {
+				order_id: orderId,
+				dispatch_items: dispatchItems.map((it) => ({
+					order_line_id: it.order_line_id,
+					serial_number: it.serial_number,
+					product_id: it.product_id,
+					product_attribute_id: it.product_attribute_id,
+					dealer_id: it.dealer_id,
+					customer_name: it.dealer_name, // old code used dealer_name as customer_name
+					user_id: userId,
+				})),
+			};
 
-	if (loading) {
-		return <Typography sx={{ p: 2 }}>Loading...</Typography>;
-	}
+			// NOTE: Adjust path if your server expects `/api/warranty/`
+			await http.post(`/warranty`, payload);
 
-	if (error) {
-		return <Typography color="error" sx={{ p: 2 }}>{error}</Typography>;
-	}
+			setSnack({ open: true, msg: "✅ Order dispatched and warranties created!", type: "success" });
+		} catch (e: any) {
+			const msg = e?.response?.data?.message || e?.message || "Dispatch failed";
+			setSnack({ open: true, msg: `❌ ${msg}`, type: "error" });
+		} finally {
+			setDispatching(false);
+		}
+	};
 
-	if (!order) {
-		return <Typography sx={{ p: 2 }}>Order not found.</Typography>;
-	}
+	/** UI: Loading / error guards */
+	if (loading) return <Typography sx={{ p: 2 }}>Loading...</Typography>;
+	if (error) return <Typography color="error" sx={{ p: 2 }}>{error}</Typography>;
+	if (!order) return <Typography sx={{ p: 2 }}>Order not found.</Typography>;
 
 	return (
 		<>
@@ -186,8 +233,16 @@ export default function OrderDetailPage() {
 						<Typography variant="h6" sx={{ flexGrow: 1 }}>
 							Order #{order.order_id}
 						</Typography>
-						<Button variant="contained" onClick={handleSave} disabled={saving}>
+
+						<Button variant="outlined" onClick={handleSave} disabled={saving} sx={{ mr: 1 }}>
 							{saving ? "Saving..." : "Save Changes"}
+						</Button>
+						<Button
+							variant="contained"
+							onClick={handleSaveAndDispatch}
+							disabled={dispatching || dispatchItems.length === 0}
+						>
+							{dispatching ? "Dispatching..." : "Save & Dispatch"}
 						</Button>
 					</Toolbar>
 				</AppBar>
@@ -195,9 +250,11 @@ export default function OrderDetailPage() {
 				{/* CONTENT */}
 				<Box sx={{ flex: "1 1 auto", minHeight: 0, overflow: "auto", p: 2 }}>
 					<Grid container spacing={3}>
-						{/* Left Side: Order Details Form */}
+						{/* Left: Order Details */}
 						<Grid item xs={12} md={4}>
-							<Typography variant="h6" gutterBottom>Details</Typography>
+							<Typography variant="h6" gutterBottom>
+								Details
+							</Typography>
 							<Card variant="outlined">
 								<CardContent>
 									<Grid container spacing={2}>
@@ -224,36 +281,125 @@ export default function OrderDetailPage() {
 											<TextField fullWidth label="Dealer" value={order.dealer_name} InputProps={{ readOnly: true }} />
 										</Grid>
 										<Grid item xs={12}>
-											<TextField fullWidth label="Date Created" value={new Date(order.date_created).toLocaleString()} InputProps={{ readOnly: true }} />
+											<TextField
+												fullWidth
+												label="Date Created"
+												value={new Date(order.date_created).toLocaleString()}
+												InputProps={{ readOnly: true }}
+											/>
 										</Grid>
 									</Grid>
 								</CardContent>
 							</Card>
 						</Grid>
 
-						{/* Right Side: Line Items Grid */}
+						{/* Right: Dispatch Items (serials + scanners) */}
 						<Grid item xs={12} md={8}>
-							<Typography variant="h6" gutterBottom>Line Items</Typography>
-							<Box sx={{ height: 400, width: "100%" }}>
-								<DataGrid
-									columns={columns}
-									rows={gridRows}
-									loading={loading}
-									disableColumnMenu
-									rowSelection={false}
-									hideFooter
-									sx={{
-										borderRadius: 1,
-										"& .MuiDataGrid-columnHeaders": {
-											background: theme.palette.grey[100],
-										},
-									}}
-								/>
-							</Box>
+							<Typography variant="h6" gutterBottom>
+								Dispatch Items
+							</Typography>
+
+							{dispatchItems.length === 0 ? (
+								<Typography color="text.secondary">No items to dispatch.</Typography>
+							) : (
+								dispatchItems.map((item, index) => (
+									<Card key={item.order_line_id} variant="outlined" sx={{ mb: 2, borderRadius: 2 }}>
+										<CardContent>
+											<Grid container spacing={1}>
+												<Grid item xs={12} sm={6}>
+													<Typography variant="body2"><b>Product ID:</b> {item.product_id}</Typography>
+												</Grid>
+												<Grid item xs={12} sm={6}>
+													<Typography variant="body2"><b>Line ID:</b> {item.order_line_id}</Typography>
+												</Grid>
+												{item.product_name && (
+													<Grid item xs={12}>
+														<Typography variant="body2"><b>Product:</b> {item.product_name}</Typography>
+													</Grid>
+												)}
+												{item.component_name && (
+													<Grid item xs={12}>
+														<Typography variant="body2"><b>Component:</b> {item.component_name}</Typography>
+													</Grid>
+												)}
+												<Grid item xs={6} sm={3}>
+													<Typography variant="body2"><b>Qty:</b> {item.quantity}</Typography>
+												</Grid>
+												<Grid item xs={6} sm={4}>
+													<Typography variant="body2"><b>Unit Price:</b> ₹{item.unit_price}</Typography>
+												</Grid>
+												<Grid item xs={12} sm={5}>
+													<Typography variant="body2"><b>Total:</b> ₹{item.total_price}</Typography>
+												</Grid>
+											</Grid>
+
+											<Divider sx={{ my: 1.5 }} />
+
+											<TextField
+												fullWidth
+												label="Serial Number"
+												variant="outlined"
+												value={item.serial_number}
+												onChange={(e) => onSerialChange(index, e.target.value)}
+											/>
+
+											<Grid container spacing={1} sx={{ mt: 1 }}>
+												<Grid item xs={12} sm={6}>
+													<Button
+														variant="outlined"
+														fullWidth
+														onClick={() => setScanningIndex(index)}
+													>
+														Scan Barcode / QR
+													</Button>
+												</Grid>
+												<Grid item xs={12} sm={6}>
+													<Button
+														variant="outlined"
+														fullWidth
+														onClick={() => setOcrCameraIndex(index)}
+													>
+														Scan From Camera
+													</Button>
+												</Grid>
+											</Grid>
+										</CardContent>
+									</Card>
+								))
+							)}
 						</Grid>
 					</Grid>
 				</Box>
 			</Paper>
+
+			{/* Scanners (portals/modal) */}
+			{scanningIndex !== null && (
+				<BarcodeScanner
+					onDetected={(serial) => {
+						setDispatchItems((prev) => {
+							const next = [...prev];
+							next[scanningIndex] = { ...next[scanningIndex], serial_number: serial };
+							return next;
+						});
+						setScanningIndex(null);
+					}}
+					onClose={() => setScanningIndex(null)}
+				/>
+			)}
+
+			{ocrCameraIndex !== null && (
+				<CameraOCRScanner
+					index={ocrCameraIndex}
+					onDetected={(i, serial) => {
+						setDispatchItems((prev) => {
+							const next = [...prev];
+							next[i] = { ...next[i], serial_number: serial };
+							return next;
+						});
+					}}
+					onClose={() => setOcrCameraIndex(null)}
+				/>
+			)}
 
 			{/* Snackbar */}
 			<Snackbar
