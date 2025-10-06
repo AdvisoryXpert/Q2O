@@ -290,7 +290,7 @@ function App(): JSX.Element {
 						...(status.existingDealerId ? { dealer_id: status.existingDealerId } : {})
 					};
 
-					const total_price = 5000;
+					const total_price = 0;
 					const product_id = 101;
 					const user_id = parseInt((await getUserId()) || "1");
 

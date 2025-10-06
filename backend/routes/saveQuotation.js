@@ -30,7 +30,24 @@ module.exports = (db) => {
 		});
 
 		Promise.all(updatePromises)
-			.then(() => res.json({ success: true }))
+			.then(() => {
+				const totalPrice = items.reduce((total, item) => {
+					if (item.is_selected) {
+						return total + (item.unit_price * item.quantity);
+					}
+					return total;
+				}, 0);
+
+				const updateQuotationSql = 'UPDATE quotation SET total_price = ? WHERE quote_id = ? AND tenant_id = ?';
+				db.query(updateQuotationSql, [totalPrice, quoteId, tenant_id], (err, result) => {
+					if (err) {
+						console.error('Failed to update total price:', err);
+						return res.status(500).json({ success: false, message: 'Failed to update total price' });
+					}
+					console.log('Total price updated successfully.');
+					res.json({ success: true });
+				});
+			})
 			.catch(err => {
 				console.error("Error saving items:", err);
 				res.status(500).json({ success: false, message: "DB error" });
