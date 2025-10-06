@@ -187,7 +187,7 @@ const LandingPage = () => {
 					<div className="collapse navbar-collapse" id="navbarNav">
 						<ul className="navbar-nav ms-auto">
 							<li className="nav-item"><a className="nav-link" href="#features">Features</a></li>
-							<li className="nav-item"><a className="nav-link" href="#pricing">Pricing</a></li>
+							{/*<li className="nav-item"><a className="nav-link" href="#pricing">Pricing</a></li>*/}
 							<li className="nav-item"><Link className="btn btn-outline-primary ms-lg-2" 
 								to="/login">Login</Link></li>
 							<li className="nav-item"><a className="btn btn-primary ms-lg-2" href="#">Sign Up</a></li>
@@ -385,6 +385,7 @@ const LandingPage = () => {
 			</section>
 
 			{/* Pricing Section */}
+			{/*
 			<section id="pricing" className="section bg-light">
 				<div className="container">
 					<h2 className="section-title" data-aos="fade-up">Choose your plan</h2>
@@ -440,7 +441,7 @@ const LandingPage = () => {
 					</div>
 				</div>
 			</section>
-
+			*/}
 			{/* FAQ Section */}
 			<section id="faq" className="section">
 				<div className="container">
