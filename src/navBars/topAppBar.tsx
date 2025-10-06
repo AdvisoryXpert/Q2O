@@ -22,8 +22,8 @@ import MenuIcon from "@mui/icons-material/Menu";
 import MenuOpenIcon from "@mui/icons-material/MenuOpen";
 import LogoutIcon from "@mui/icons-material/Logout";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
-import { Link, useNavigate, useLocation, Outlet } from "react-router-dom";
-import qorzaLogo from "../../assets/Qorza.png";
+import { useNavigate, useLocation, Outlet } from "react-router-dom";
+import TenantDisplay from "../components/TenantDisplay";
 import { navIcons, type NavItem } from "./navIcons";
 import { http } from "../lib/http";
 import { clearSessionCache, getUserName } from "../services/AuthService";
@@ -87,13 +87,7 @@ const TopAppBar: React.FC = () => {
 			>
 				{open && (
 					<Box sx={{ p: 2, textAlign: 'center' }}>
-						<Link to="/">
-							<img
-								src={qorzaLogo}
-								alt="Quotation to Order"
-								style={{ width: '70%', borderRadius: '8px' }}
-							/>
-						</Link>
+						<TenantDisplay />
 					</Box>
 				)}
 				<Toolbar sx={{ minHeight: 64, px: 1.5, gap: 1 }}>
@@ -155,7 +149,7 @@ const TopAppBar: React.FC = () => {
 					{open ? (
 						<Box sx={{ flex: 1, minWidth: 0 }}>
 							<Typography noWrap variant="body2" sx={{ fontWeight: 600 }}>
-								{userName ? `Welcome, ${userName}` : "Welcome"}
+								{userName ? `Hello, ${userName}` : "Welcome"}
 							</Typography>
 							<Button onClick={handleLogout} startIcon={<LogoutIcon sx={{ color: 'white' }} />} size="small" sx={{ mt: 0.5, textTransform: "none", color: "white" }}>
 								Logout

@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from "react";
-import { Box, Typography, Avatar, Divider } from "@mui/material";
+import { Box, Typography, Avatar } from "@mui/material";
 import { http } from "../lib/http";
 
 type Tenant = {
@@ -33,14 +33,12 @@ const TenantDisplay: React.FC = () => {
 	const logoUrl = tenant.logo_url;
 
 	return (
-		<Box sx={{ width: "100%", mb: 2 }}>
+		<Box sx={{ width: "100%", p: 2 }}>
 			<Box
 				sx={{
 					display: "flex",
 					alignItems: "center",
-					gap: 3,
-					p: 2,
-					width: "100%",
+					gap: 2,
 				}}
 			>
 				<Avatar
@@ -48,32 +46,24 @@ const TenantDisplay: React.FC = () => {
 					alt={tenant.name}
 					variant="rounded"
 					sx={{
-						width: 120,
-						height: 120,
-						border: "4px solid rgba(255, 255, 255, 0.5)",
-						boxShadow: "0 8px 24px rgba(0,0,0,0.2)",
+						width: 80,
+						height: 80,
+						border: "3px solid rgba(255, 255, 255, 0.5)",
+						boxShadow: "0 6px 18px rgba(0,0,0,0.2)",
 						"& .MuiAvatar-img": {
 							objectFit: "contain",
 						},
 					}}
 				/>
 				<Box>
-					<Typography
-						variant="h2"
-						component="h1"
-						sx={{
-							fontWeight: 700,
-							color: "text.primary",
-						}}
-					>
+					<Typography variant="h6" component="h2" sx={{ fontWeight: 600, color: "text.primary" }}>
 						{tenant.name}
 					</Typography>
-					<Typography variant="h5" color="text.secondary">
+					<Typography variant="body1" color="text.secondary">
 						Welcome
 					</Typography>
 				</Box>
 			</Box>
-			<Divider sx={{ mt: 2 }} />
 		</Box>
 	);
 };

@@ -20,7 +20,7 @@ import ReminderSection from "../components/reminders";
 import OrdersOverview from "../components/Dashboard/OrdersOverview";
 import { useNavigate } from "react-router-dom";
 import DealerFollowUps from "../components/Dashboard/DealerFollowUps";
-import TenantDisplay from "../components/TenantDisplay";
+//import TenantDisplay from "../components/TenantDisplay";
 
 const ChatbotHome: React.FC = () => {
 	const theme = useTheme();
@@ -35,27 +35,6 @@ const ChatbotHome: React.FC = () => {
 
 	return (
 		<Box sx={{ minHeight: "100vh", bgcolor: "background.default" }}>
-			{/* Header */}
-			<Box
-				sx={{
-					py: { xs: 2, md: 3 },
-					background:
-            "linear-gradient(90deg, rgba(0,82,204,0.12) 0%, rgba(2,132,199,0.12) 100%)",
-					borderBottom: `1px solid ${theme.palette.divider}`,
-				}}
-			>
-				<Container maxWidth="xl">
-					<Grid container spacing={2} alignItems="center">
-						<Grid item xs={12} md={12}>
-							<TenantDisplay />
-							<Typography variant="body2" color="text.secondary">
-								Quotes, reminders, and orders at a glance.
-							</Typography>
-						</Grid>
-					</Grid>
-				</Container>
-			</Box>
-
 			{/* Main content */}
 			<Container maxWidth="xl" sx={{ py: 2 }}>
 				<Grid container spacing={2}>
