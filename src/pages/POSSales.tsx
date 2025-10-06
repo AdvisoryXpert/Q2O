@@ -5,6 +5,8 @@ import {
 	Box,
 	Button,
 	Card,
+	Container,
+	Grid,
 	IconButton,
 	Paper,
 	TextField,
@@ -24,6 +26,7 @@ import RemoveIcon from "@mui/icons-material/Remove";
 import AddIcon from "@mui/icons-material/Add";
 import { http } from "../lib/http";
 import { useNavigate } from "react-router-dom";
+import TenantDisplay from "../components/TenantDisplay";
 
 /* -------------------------- Types -------------------------- */
 type Dealer = { dealer_id: number; full_name: string; [k: string]: any };
@@ -229,300 +232,315 @@ export default function POSSalesPage() {
 	const canAddToCart = rows.some((r) => !!r.product_id && !!r.component_id && !r.disabled);
 
 	return (
-		<Paper
-			sx={{
-				position: "fixed",
-				left: isMobile ? 0 : "var(--app-drawer-width, 240px)",
-				top: "var(--app-header-height, 56px)",
-				right: 0,
-				bottom: 100, // Added margin for chatbot
-				display: "flex",
-				flexDirection: "column",
-				borderRadius: 2,
-				boxShadow: 3,
-				overflow: "hidden",
-				bgcolor: "background.paper",
-			}}
-		>
-			{/* Top Bar */}
-			<AppBar position="static" color="transparent" elevation={0} sx={{ flex: "0 0 auto" }}>
-				<Toolbar
-					sx={{
-						minHeight: 56,
-						gap: 2,
-						justifyContent: "flex-start",
-						px: { xs: 1.5, sm: 2 },
-					}}
-				>
-					<Typography variant="h6" sx={{ fontWeight: 700, mr: 1 }}>
-						Point of Sale
-					</Typography>
-
-					{/* Dealer typed search */}
-					<Autocomplete
-						disablePortal
-						options={dealers}
-						loading={dealersLoading}
-						getOptionLabel={(opt) => opt?.full_name ?? ""}
-						isOptionEqualToValue={(o, v) => o.dealer_id === v.dealer_id}
-						sx={{ flex: 1, maxWidth: 560 }}
-						value={
-							selectedDealer === "" ? null : dealers.find((d) => d.dealer_id === selectedDealer) ?? null
-						}
-						onChange={(_, newValue) => setSelectedDealer(newValue ? newValue.dealer_id : "")}
-						renderInput={(params) => (
-							<TextField
-								{...params}
-								size="small"
-								fullWidth
-								label="Select Dealer"
-								placeholder={dealersLoading ? "Loading..." : "Type to search"}
-							/>
-						)}
-					/>
-				</Toolbar>
-			</AppBar>
-
-			{/* Content: FLEX layout → left grows, cart fixed width */}
+		<Box>
+			{/* Header */}
 			<Box
 				sx={{
-					flex: "1 1 auto",
-					minHeight: 0,
-					overflow: "hidden",
-					display: "flex",
-					flexDirection: { xs: "column", md: "row" },
-					gap: 2,
-					p: { xs: 1.5, sm: 2 },
+					py: 0,
+					background:
+            "linear-gradient(90deg, rgba(0,82,204,0.12) 0%, rgba(2,132,199,0.12) 100%)",
+					borderBottom: `1px solid ${theme.palette.divider}`,
 				}}
 			>
-				{/* LEFT: fills all width → BIG inputs */}
-				<Box sx={{ flex: 1, minWidth: 0, overflowY: "auto" }}>
-					<Card
-						variant="outlined"
+				<Container maxWidth="xl">
+					<Grid container spacing={2} alignItems="center">
+						<Grid item xs={12} md={12}>
+							<TenantDisplay />
+						</Grid>
+					</Grid>
+				</Container>
+			</Box>
+			<Paper
+				sx={{
+					margin: 2,
+					display: "flex",
+					flexDirection: "column",
+					borderRadius: 2,
+					boxShadow: 3,
+					overflow: "hidden",
+					bgcolor: "background.paper",
+				}}
+			>
+				{/* Top Bar */}
+				<AppBar position="static" color="transparent" elevation={0} sx={{ flex: "0 0 auto" }}>
+					<Toolbar
 						sx={{
-							p: { xs: 2, sm: 2.5 },
-							mb: 2,
-							borderRadius: 3,
-							borderColor: "divider",
-							bgcolor: "grey.50",
+							minHeight: 56,
+							gap: 2,
+							justifyContent: "flex-start",
+							px: { xs: 1.5, sm: 2 },
 						}}
 					>
-						<Typography variant="subtitle1" fontWeight={800} sx={{ mb: 1.5 }}>
-							Items
+						<Typography variant="h6" sx={{ fontWeight: 700, mr: 1 }}>
+							Point of Sale
 						</Typography>
 
-						{rows.map((row, index) => {
-							const productValue =
+						{/* Dealer typed search */}
+						<Autocomplete
+							disablePortal
+							options={dealers}
+							loading={dealersLoading}
+							getOptionLabel={(opt) => opt?.full_name ?? ""}
+							isOptionEqualToValue={(o, v) => o.dealer_id === v.dealer_id}
+							sx={{ flex: 1, maxWidth: 560 }}
+							value={
+								selectedDealer === "" ? null : dealers.find((d) => d.dealer_id === selectedDealer) ?? null
+							}
+							onChange={(_, newValue) => setSelectedDealer(newValue ? newValue.dealer_id : "")}
+							renderInput={(params) => (
+								<TextField
+									{...params}
+									size="small"
+									fullWidth
+									label="Select Dealer"
+									placeholder={dealersLoading ? "Loading..." : "Type to search"}
+								/>
+							)}
+						/>
+					</Toolbar>
+				</AppBar>
+
+				{/* Content: FLEX layout → left grows, cart fixed width */}
+				<Box
+					sx={{
+						flex: "1 1 auto",
+						minHeight: 0,
+						overflow: "hidden",
+						display: "flex",
+						flexDirection: { xs: "column", md: "row" },
+						gap: 2,
+						p: { xs: 1.5, sm: 2 },
+					}}
+				>
+					{/* LEFT: fills all width → BIG inputs */}
+					<Box sx={{ flex: 1, minWidth: 0, overflowY: "auto" }}>
+						<Card
+							variant="outlined"
+							sx={{
+								p: { xs: 2, sm: 2.5 },
+								mb: 2,
+								borderRadius: 3,
+								borderColor: "divider",
+								bgcolor: "grey.50",
+							}}
+						>
+							<Typography variant="subtitle1" fontWeight={800} sx={{ mb: 1.5 }}>
+								Items
+							</Typography>
+
+							{rows.map((row, index) => {
+								const productValue =
                 row.product_id === "" ? null : products.find((p) => p.product_id === row.product_id) ?? null;
-							const componentValue =
+								const componentValue =
                 row.component_id === ""
                 	? null
                 	: row.components.find((c) => c.attribute_id === row.component_id) ?? null;
 
-							return (
-								<Card
-									key={index}
+								return (
+									<Card
+										key={index}
+										variant="outlined"
+										sx={{ p: { xs: 1.5, sm: 2 }, mb: 1.5, borderRadius: 2, background: "#fff" }}
+									>
+										<Stack spacing={1.5}>
+											{/* PRODUCT — XL, full width */}
+											<Autocomplete
+												disablePortal
+												options={products}
+												loading={productsLoading}
+												getOptionLabel={(opt) => opt?.product_name ?? ""}
+												isOptionEqualToValue={(o, v) => o.product_id === v.product_id}
+												value={productValue}
+												onChange={(_, newValue) =>
+													updateRowProduct(index, newValue ? newValue.product_id : "")
+												}
+												renderInput={(params) => (
+													<TextField
+														{...params}
+														label="Product"
+														fullWidth
+														placeholder={productsLoading ? "Loading..." : "Type to search product"}
+														sx={inputXL}
+													/>
+												)}
+												disabled={row.disabled}
+												// make the dropdown wide too
+												slotProps={{ paper: { sx: { minWidth: 720 } } }}
+											/>
+
+											{/* COMPONENT — XL, full width */}
+											<Autocomplete
+												disablePortal
+												options={row.components}
+												getOptionLabel={(opt) =>
+													opt ? `${opt.attribute_name} — ${toINR(opt.price)}` : ""
+												}
+												isOptionEqualToValue={(o, v) => o.attribute_id === v.attribute_id}
+												value={componentValue}
+												onChange={(_, newValue) =>
+													updateRowComponent(index, newValue ? newValue.attribute_id : "")
+												}
+												renderInput={(params) => (
+													<TextField
+														{...params}
+														label="Component"
+														fullWidth
+														placeholder="Pick a variant"
+														sx={inputXL}
+													/>
+												)}
+												disabled={row.disabled || !row.product_id}
+												slotProps={{ paper: { sx: { minWidth: 720 } } }}
+											/>
+
+											{/* Row actions */}
+											<Stack direction="row" spacing={1} justifyContent="flex-end">
+												{row.disabled && (
+													<Chip size="small" color="success" label="Added" sx={{ fontWeight: 700 }} />
+												)}
+												<IconButton onClick={() => removeRow(index)} color="error" disabled={rows.length === 1}>
+													<DeleteIcon />
+												</IconButton>
+											</Stack>
+										</Stack>
+									</Card>
+								);
+							})}
+
+							{/* Big actions */}
+							<Stack
+								direction={{ xs: "column", sm: "row" }}
+								spacing={1.5}
+								sx={{ mt: 1 }}
+								alignItems={{ xs: "stretch", sm: "center" }}
+							>
+								<Button
 									variant="outlined"
-									sx={{ p: { xs: 1.5, sm: 2 }, mb: 1.5, borderRadius: 2, background: "#fff" }}
+									startIcon={<AddCircleOutlineIcon />}
+									onClick={addRow}
+									size="large"
+									sx={{ fontWeight: 800, py: 1.25 }}
+									fullWidth={isMobile}
 								>
-									<Stack spacing={1.5}>
-										{/* PRODUCT — XL, full width */}
-										<Autocomplete
-											disablePortal
-											options={products}
-											loading={productsLoading}
-											getOptionLabel={(opt) => opt?.product_name ?? ""}
-											isOptionEqualToValue={(o, v) => o.product_id === v.product_id}
-											value={productValue}
-											onChange={(_, newValue) =>
-												updateRowProduct(index, newValue ? newValue.product_id : "")
-											}
-											renderInput={(params) => (
-												<TextField
-													{...params}
-													label="Product"
-													fullWidth
-													placeholder={productsLoading ? "Loading..." : "Type to search product"}
-													sx={inputXL}
-												/>
-											)}
-											disabled={row.disabled}
-											// make the dropdown wide too
-											slotProps={{ paper: { sx: { minWidth: 720 } } }}
-										/>
+									Add Product
+								</Button>
+								<Button
+									variant="contained"
+									onClick={addToCart}
+									disabled={!canAddToCart}
+									size="large"
+									sx={{ fontWeight: 800, py: 1.25 }}
+									fullWidth={isMobile}
+								>
+									Add Selected to Cart
+								</Button>
+							</Stack>
+						</Card>
+					</Box>
 
-										{/* COMPONENT — XL, full width */}
-										<Autocomplete
-											disablePortal
-											options={row.components}
-											getOptionLabel={(opt) =>
-												opt ? `${opt.attribute_name} — ${toINR(opt.price)}` : ""
-											}
-											isOptionEqualToValue={(o, v) => o.attribute_id === v.attribute_id}
-											value={componentValue}
-											onChange={(_, newValue) =>
-												updateRowComponent(index, newValue ? newValue.attribute_id : "")
-											}
-											renderInput={(params) => (
-												<TextField
-													{...params}
-													label="Component"
-													fullWidth
-													placeholder="Pick a variant"
-													sx={inputXL}
-												/>
-											)}
-											disabled={row.disabled || !row.product_id}
-											slotProps={{ paper: { sx: { minWidth: 720 } } }}
-										/>
+					{/* RIGHT: fixed width cart on desktop → left stays huge */}
+					<Box
+						sx={{
+							width: { xs: "100%", md: 460, lg: 520 }, // fixed width sidebar
+							flexShrink: 0,
+							display: "flex",
+							flexDirection: "column",
+							bgcolor: "grey.50",
+							borderRadius: 2,
+							p: 2,
+							overflow: "hidden",
+						}}
+					>
+						<Typography variant="h6" gutterBottom sx={{ display: "flex", alignItems: "center" }}>
+							<ShoppingCartIcon sx={{ mr: 1 }} /> Cart
+						</Typography>
+						<Divider sx={{ mb: 2 }} />
 
-										{/* Row actions */}
-										<Stack direction="row" spacing={1} justifyContent="flex-end">
-											{row.disabled && (
-												<Chip size="small" color="success" label="Added" sx={{ fontWeight: 700 }} />
-											)}
-											<IconButton onClick={() => removeRow(index)} color="error" disabled={rows.length === 1}>
-												<DeleteIcon />
+						<Box sx={{ flexGrow: 1, overflowY: "auto", pr: 0.5 }}>
+							{cart.length === 0 ? (
+								<Typography color="text.secondary">Your cart is empty</Typography>
+							) : (
+								cart.map((item) => (
+									<Card
+										key={item.attribute_id}
+										variant="outlined"
+										sx={{ display: "flex", alignItems: "center", p: 1.25, mb: 1, borderRadius: 2 }}
+									>
+										<Box sx={{ flexGrow: 1, minWidth: 0 }}>
+											<Typography variant="body1" fontWeight="bold" noWrap title={item.name}>
+												{item.name}
+											</Typography>
+											<Typography variant="body2" color="text.secondary">
+												Price: {toINR(item.price)}
+											</Typography>
+										</Box>
+
+										<Stack direction="row" alignItems="center" sx={{ mx: 1 }}>
+											<IconButton
+												size="small"
+												onClick={() => updateQuantity(item.attribute_id, item.quantity - 1)}
+												disabled={item.quantity <= 1}
+											>
+												<RemoveIcon fontSize="small" />
+											</IconButton>
+											<Typography sx={{ mx: 1, minWidth: 20, textAlign: "center" }}>
+												{item.quantity}
+											</Typography>
+											<IconButton
+												size="small"
+												onClick={() => updateQuantity(item.attribute_id, item.quantity + 1)}
+											>
+												<AddIcon fontSize="small" />
 											</IconButton>
 										</Stack>
-									</Stack>
-								</Card>
-							);
-						})}
 
-						{/* Big actions */}
-						<Stack
-							direction={{ xs: "column", sm: "row" }}
-							spacing={1.5}
-							sx={{ mt: 1 }}
-							alignItems={{ xs: "stretch", sm: "center" }}
-						>
-							<Button
+										<Typography
+											variant="body1"
+											sx={{ minWidth: 96, textAlign: "right", fontWeight: "bold" }}
+										>
+											{toINR(item.price * item.quantity)}
+										</Typography>
+
+										<IconButton onClick={() => removeItem(item.attribute_id)} color="error" sx={{ ml: 1 }}>
+											<DeleteIcon />
+										</IconButton>
+									</Card>
+								))
+							)}
+						</Box>
+
+						<Box sx={{ pt: 2, mt: "auto" }}>
+							<TextField
+								label="Notes for Quotation"
 								variant="outlined"
-								startIcon={<AddCircleOutlineIcon />}
-								onClick={addRow}
-								size="large"
-								sx={{ fontWeight: 800, py: 1.25 }}
-								fullWidth={isMobile}
-							>
-								Add Product
-							</Button>
+								fullWidth
+								multiline
+								rows={2}
+								value={cartNote}
+								onChange={(e) => setCartNote(e.target.value)}
+								sx={{ mb: 2 }}
+							/>
+							<Stack direction="row" justifyContent="space-between" sx={{ mb: 2 }}>
+								<Typography variant="h6">Subtotal:</Typography>
+								<Typography variant="h6" fontWeight="bold">
+									{toINR(total)}
+								</Typography>
+							</Stack>
 							<Button
 								variant="contained"
-								onClick={addToCart}
-								disabled={!canAddToCart}
+								color="primary"
+								fullWidth
+								disabled={cart.length === 0 || !selectedDealer}
+								onClick={handleSubmitOrder}
 								size="large"
-								sx={{ fontWeight: 800, py: 1.25 }}
-								fullWidth={isMobile}
+								sx={{ py: 1.5, fontWeight: "bold" }}
 							>
-								Add Selected to Cart
+								Proceed to Checkout
 							</Button>
-						</Stack>
-					</Card>
-				</Box>
-
-				{/* RIGHT: fixed width cart on desktop → left stays huge */}
-				<Box
-					sx={{
-						width: { xs: "100%", md: 460, lg: 520 }, // fixed width sidebar
-						flexShrink: 0,
-						display: "flex",
-						flexDirection: "column",
-						bgcolor: "grey.50",
-						borderRadius: 2,
-						p: 2,
-						overflow: "hidden",
-					}}
-				>
-					<Typography variant="h6" gutterBottom sx={{ display: "flex", alignItems: "center" }}>
-						<ShoppingCartIcon sx={{ mr: 1 }} /> Cart
-					</Typography>
-					<Divider sx={{ mb: 2 }} />
-
-					<Box sx={{ flexGrow: 1, overflowY: "auto", pr: 0.5 }}>
-						{cart.length === 0 ? (
-							<Typography color="text.secondary">Your cart is empty</Typography>
-						) : (
-							cart.map((item) => (
-								<Card
-									key={item.attribute_id}
-									variant="outlined"
-									sx={{ display: "flex", alignItems: "center", p: 1.25, mb: 1, borderRadius: 2 }}
-								>
-									<Box sx={{ flexGrow: 1, minWidth: 0 }}>
-										<Typography variant="body1" fontWeight="bold" noWrap title={item.name}>
-											{item.name}
-										</Typography>
-										<Typography variant="body2" color="text.secondary">
-											Price: {toINR(item.price)}
-										</Typography>
-									</Box>
-
-									<Stack direction="row" alignItems="center" sx={{ mx: 1 }}>
-										<IconButton
-											size="small"
-											onClick={() => updateQuantity(item.attribute_id, item.quantity - 1)}
-											disabled={item.quantity <= 1}
-										>
-											<RemoveIcon fontSize="small" />
-										</IconButton>
-										<Typography sx={{ mx: 1, minWidth: 20, textAlign: "center" }}>
-											{item.quantity}
-										</Typography>
-										<IconButton
-											size="small"
-											onClick={() => updateQuantity(item.attribute_id, item.quantity + 1)}
-										>
-											<AddIcon fontSize="small" />
-										</IconButton>
-									</Stack>
-
-									<Typography
-										variant="body1"
-										sx={{ minWidth: 96, textAlign: "right", fontWeight: "bold" }}
-									>
-										{toINR(item.price * item.quantity)}
-									</Typography>
-
-									<IconButton onClick={() => removeItem(item.attribute_id)} color="error" sx={{ ml: 1 }}>
-										<DeleteIcon />
-									</IconButton>
-								</Card>
-							))
-						)}
-					</Box>
-
-					<Box sx={{ pt: 2, mt: "auto" }}>
-						<TextField
-							label="Notes for Quotation"
-							variant="outlined"
-							fullWidth
-							multiline
-							rows={2}
-							value={cartNote}
-							onChange={(e) => setCartNote(e.target.value)}
-							sx={{ mb: 2 }}
-						/>
-						<Stack direction="row" justifyContent="space-between" sx={{ mb: 2 }}>
-							<Typography variant="h6">Subtotal:</Typography>
-							<Typography variant="h6" fontWeight="bold">
-								{toINR(total)}
-							</Typography>
-						</Stack>
-						<Button
-							variant="contained"
-							color="primary"
-							fullWidth
-							disabled={cart.length === 0 || !selectedDealer}
-							onClick={handleSubmitOrder}
-							size="large"
-							sx={{ py: 1.5, fontWeight: "bold" }}
-						>
-							Proceed to Checkout
-						</Button>
+						</Box>
 					</Box>
 				</Box>
-			</Box>
-		</Paper>
+			</Paper>
+		</Box>
 	);
 }
