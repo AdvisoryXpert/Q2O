@@ -16,6 +16,7 @@ import {
 	Snackbar,
 	Alert,
 	Divider,
+	Popover,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import { useParams, useNavigate } from "react-router-dom";
@@ -23,7 +24,7 @@ import { http } from "../lib/http";
 import { getUserId } from "../services/AuthService";
 import { BarcodeScanner, CameraOCRScanner } from "../utils/scanner_ocr";
 
-/** Types (aligns new data with dispatch needs) */
+/** Types */
 type Order = {
   order_id: number;
   customer_name: string;
@@ -37,9 +38,9 @@ type Order = {
 type OrderLineItem = {
   order_line_id: number;
   product_id: number;
-  product_attribute_id?: number; // optional (old had this)
-  product_name?: string;         // optional (new API may not send)
-  component_name?: string;       // optional (old UI field)
+  product_attribute_id?: number;
+  product_name?: string;
+  component_name?: string;
   quantity: number;
   unit_price: number;
   total_price: number;
@@ -49,7 +50,7 @@ type DispatchItem = OrderLineItem & {
   dealer_id: number;
   dealer_name: string;
   serial_number: string;
-  customer_name: string; // for warranty payload (old used dealer_name here)
+  customer_name: string;
 };
 
 type OrderForm = {
@@ -57,17 +58,15 @@ type OrderForm = {
   status: string;
 };
 
-/** API helpers - keep new fetch style */
+/** API helpers */
 async function fetchOrder(orderId: string): Promise<Order> {
 	const { data } = await http.get(`/orders/${orderId}`);
 	return data;
 }
-
 async function fetchOrderLineItems(orderId: string): Promise<OrderLineItem[]> {
 	const { data } = await http.get(`/orders/${orderId}/items`);
 	return data ?? [];
 }
-
 async function updateOrder(orderId: string, payload: Partial<OrderForm>): Promise<void> {
 	await http.put(`/orders/${orderId}`, payload);
 }
@@ -84,7 +83,7 @@ export default function OrderDetailPage() {
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 
-	/** Form state (left panel) */
+	/** Form state */
 	const [form, setForm] = useState<OrderForm>({ invoice_id: "", status: "" });
 	const [saving, setSaving] = useState(false);
 	const [dispatching, setDispatching] = useState(false);
@@ -96,9 +95,9 @@ export default function OrderDetailPage() {
 		type: "success",
 	});
 
-	/** Scanners */
-	const [scanningIndex, setScanningIndex] = useState<number | null>(null);
-	const [ocrCameraIndex, setOcrCameraIndex] = useState<number | null>(null);
+	/** Popover state (anchor next to each line) */
+	const [scanPopover, setScanPopover] = useState<{ index: number; anchorEl: HTMLElement } | null>(null);
+	const [ocrPopover, setOcrPopover] = useState<{ index: number; anchorEl: HTMLElement } | null>(null);
 
 	/** Load order + items */
 	useEffect(() => {
@@ -106,23 +105,15 @@ export default function OrderDetailPage() {
 		(async () => {
 			try {
 				setLoading(true);
-				const [orderData, items] = await Promise.all([
-					fetchOrder(orderId),
-					fetchOrderLineItems(orderId),
-				]);
-
+				const [orderData, items] = await Promise.all([fetchOrder(orderId), fetchOrderLineItems(orderId)]);
 				setOrder(orderData);
-				setForm({
-					invoice_id: orderData.invoice_id || "",
-					status: orderData.status,
-				});
+				setForm({ invoice_id: orderData.invoice_id || "", status: orderData.status });
 
-				// Map to DispatchItem shape, seed serials as empty
 				const mapped: DispatchItem[] = (items || []).map((it) => ({
 					...it,
 					dealer_id: orderData.dealer_id,
 					dealer_name: orderData.dealer_name,
-					customer_name: orderData.dealer_name, // old UI used dealer name here
+					customer_name: orderData.dealer_name,
 					serial_number: "",
 				}));
 				setDispatchItems(mapped);
@@ -175,8 +166,6 @@ export default function OrderDetailPage() {
 		setDispatching(true);
 		try {
 			const userId = (await getUserId()) || "1";
-
-			// Build minimal payload expected by warranty endpoint
 			const payload = {
 				order_id: orderId,
 				dispatch_items: dispatchItems.map((it) => ({
@@ -185,14 +174,12 @@ export default function OrderDetailPage() {
 					product_id: it.product_id,
 					product_attribute_id: it.product_attribute_id,
 					dealer_id: it.dealer_id,
-					customer_name: it.dealer_name, // old code used dealer_name as customer_name
+					customer_name: it.dealer_name,
 					user_id: userId,
 				})),
 			};
-
-			// NOTE: Adjust path if your server expects `/api/warranty/`
+			// Adjust path if needed (e.g., /api/warranty/)
 			await http.post(`/warranty`, payload);
-
 			setSnack({ open: true, msg: "✅ Order dispatched and warranties created!", type: "success" });
 		} catch (e: any) {
 			const msg = e?.response?.data?.message || e?.message || "Dispatch failed";
@@ -293,7 +280,7 @@ export default function OrderDetailPage() {
 							</Card>
 						</Grid>
 
-						{/* Right: Dispatch Items (serials + scanners) */}
+						{/* Right: Dispatch Items */}
 						<Grid item xs={12} md={8}>
 							<Typography variant="h6" gutterBottom>
 								Dispatch Items
@@ -348,7 +335,7 @@ export default function OrderDetailPage() {
 													<Button
 														variant="outlined"
 														fullWidth
-														onClick={() => setScanningIndex(index)}
+														onClick={(e) => setScanPopover({ index, anchorEl: e.currentTarget as HTMLElement })}
 													>
 														Scan Barcode / QR
 													</Button>
@@ -357,7 +344,7 @@ export default function OrderDetailPage() {
 													<Button
 														variant="outlined"
 														fullWidth
-														onClick={() => setOcrCameraIndex(index)}
+														onClick={(e) => setOcrPopover({ index, anchorEl: e.currentTarget as HTMLElement })}
 													>
 														Scan From Camera
 													</Button>
@@ -372,34 +359,88 @@ export default function OrderDetailPage() {
 				</Box>
 			</Paper>
 
-			{/* Scanners (portals/modal) */}
-			{scanningIndex !== null && (
-				<BarcodeScanner
-					onDetected={(serial) => {
-						setDispatchItems((prev) => {
-							const next = [...prev];
-							next[scanningIndex] = { ...next[scanningIndex], serial_number: serial };
-							return next;
-						});
-						setScanningIndex(null);
-					}}
-					onClose={() => setScanningIndex(null)}
-				/>
-			)}
+			{/* --- Popover: Barcode / QR --- */}
+			<Popover
+				open={Boolean(scanPopover)}
+				anchorEl={scanPopover?.anchorEl || null}
+				onClose={() => setScanPopover(null)}
+				anchorOrigin={{ vertical: "center", horizontal: "right" }}
+				transformOrigin={{ vertical: "center", horizontal: "left" }}
+				PaperProps={{
+					sx: {
+						p: 1,
+						width: 360,
+						maxWidth: "85vw",
+						height: 360,
+						display: "flex",
+						flexDirection: "column",
+						overflow: "hidden",
+					},
+				}}
+			>
+				{scanPopover !== null && (
+					<Box sx={{ flex: 1, minHeight: 0 }}>
+						<Typography variant="subtitle2" sx={{ mb: 1 }}>
+							Scan Barcode / QR (Line #{scanPopover.index + 1})
+						</Typography>
+						<Box sx={{ borderRadius: 1, overflow: "hidden", height: "100%" }}>
+							<BarcodeScanner
+								onDetected={(serial) => {
+									setDispatchItems((prev) => {
+										const next = [...prev];
+										next[scanPopover.index] = { ...next[scanPopover.index], serial_number: serial };
+										return next;
+									});
+									setScanPopover(null);
+								}}
+								onClose={() => setScanPopover(null)}
+							/>
+						</Box>
+					</Box>
+				)}
+			</Popover>
 
-			{ocrCameraIndex !== null && (
-				<CameraOCRScanner
-					index={ocrCameraIndex}
-					onDetected={(i, serial) => {
-						setDispatchItems((prev) => {
-							const next = [...prev];
-							next[i] = { ...next[i], serial_number: serial };
-							return next;
-						});
-					}}
-					onClose={() => setOcrCameraIndex(null)}
-				/>
-			)}
+			{/* --- Popover: Camera OCR --- */}
+			<Popover
+				open={Boolean(ocrPopover)}
+				anchorEl={ocrPopover?.anchorEl || null}
+				onClose={() => setOcrPopover(null)}
+				anchorOrigin={{ vertical: "center", horizontal: "right" }}
+				transformOrigin={{ vertical: "center", horizontal: "left" }}
+				PaperProps={{
+					sx: {
+						p: 1,
+						width: 420,
+						maxWidth: "90vw",
+						height: 420,
+						display: "flex",
+						flexDirection: "column",
+						overflow: "hidden",
+					},
+				}}
+			>
+				{ocrPopover !== null && (
+					<Box sx={{ flex: 1, minHeight: 0 }}>
+						<Typography variant="subtitle2" sx={{ mb: 1 }}>
+							Scan From Camera (Line #{ocrPopover.index + 1})
+						</Typography>
+						<Box sx={{ borderRadius: 1, overflow: "hidden", height: "100%" }}>
+							<CameraOCRScanner
+								index={ocrPopover.index}
+								onDetected={(i, serial) => {
+									setDispatchItems((prev) => {
+										const next = [...prev];
+										next[i] = { ...next[i], serial_number: serial };
+										return next;
+									});
+									setOcrPopover(null);
+								}}
+								onClose={() => setOcrPopover(null)}
+							/>
+						</Box>
+					</Box>
+				)}
+			</Popover>
 
 			{/* Snackbar */}
 			<Snackbar
