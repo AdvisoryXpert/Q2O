@@ -1,4 +1,3 @@
-// src/pages/QuotationPage.tsx
 import { useEffect, useMemo, useState } from "react";
 import {
 	AppBar,
@@ -17,6 +16,7 @@ import {
 	Typography,
 	useMediaQuery,
 	useTheme,
+	TablePagination,
 } from "@mui/material";
 import { DataGrid, GridColDef, GridToolbar } from "@mui/x-data-grid";
 import SearchIcon from "@mui/icons-material/Search";
@@ -84,6 +84,69 @@ const getRowArg = (args: any[]) =>
 const getValueArg = (args: any[]) =>
 	(args[0] && typeof args[0] === "object" && "value" in args[0] ? (args[0] as any).value : args[0]); // old vs new
 
+const renderStatusChip = (status: string | null | undefined) => {
+	const s = String(status ?? "").toLowerCase();
+
+	if (s.includes("accept") || s === "approved") {
+		return (
+			<Chip
+				icon={<CheckCircleIcon />}
+				label="Accepted"
+				color="success"
+				variant="outlined"
+				size="small"
+				sx={{ fontWeight: 700 }}
+			/>
+		);
+	}
+	if (s.includes("reject") || s === "cancelled" || s === "canceled") {
+		return (
+			<Chip
+				icon={<CancelIcon />}
+				label="Rejected"
+				color="error"
+				variant="outlined"
+				size="small"
+				sx={{ fontWeight: 700 }}
+			/>
+		);
+	}
+	if (s.includes("sent")) {
+		return (
+			<Chip
+				icon={<SendIcon />}
+				label="Sent"
+				color="warning"
+				variant="outlined"
+				size="small"
+				sx={{ fontWeight: 700 }}
+			/>
+		);
+	}
+	if (s.includes("finalized")) {
+		return (
+			<Chip
+				icon={<CheckCircleIcon />}
+				label="Finalized"
+				color="primary"
+				variant="outlined"
+				size="small"
+				sx={{ fontWeight: 700 }}
+			/>
+		);
+	}
+	return (
+		<Chip
+			icon={<DraftsIcon />}
+			label="Draft"
+			color="warning"
+			variant="outlined"
+			size="small"
+			sx={{ fontWeight: 700 }}
+		/>
+	);
+};
+
 /* ============================================================ */
 export default function QuotationPage({ dealerId, limit }: Props) {
 	const theme = useTheme();
@@ -94,6 +157,10 @@ export default function QuotationPage({ dealerId, limit }: Props) {
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [search, setSearch] = useState("");
+	const [paginationModel, setPaginationModel] = useState({
+		page: 0,
+		pageSize: 50,
+	});
 
 	useEffect(() => {
 		(async () => {
@@ -133,6 +200,13 @@ export default function QuotationPage({ dealerId, limit }: Props) {
 				.some((v) => String(v).toLowerCase().includes(q))
 		);
 	}, [rows, search]);
+
+	const paginatedFiltered = useMemo(() => {
+		const { page, pageSize } = paginationModel;
+		const start = page * pageSize;
+		const end = start + pageSize;
+		return filtered.slice(start, end);
+	}, [filtered, paginationModel]);
 
 	/* ---------------- actions ---------------- */
 	const handleDelete = async (d: Quote) => {
@@ -188,54 +262,7 @@ export default function QuotationPage({ dealerId, limit }: Props) {
 			renderCell: ((...args: any[]) => {
 				const value = getValueArg(args);
 				const row = getRowArg(args);
-				const s = String(value ?? row?.status ?? "").toLowerCase();
-
-				if (s.includes("accept") || s === "approved") {
-					return (
-						<Chip
-							icon={<CheckCircleIcon />}
-							label="Accepted"
-							color="success"
-							variant="outlined"
-							size="small"
-							sx={{ fontWeight: 700 }}
-						/>
-					);
-				}
-				if (s.includes("reject") || s === "cancelled" || s === "canceled") {
-					return (
-						<Chip
-							icon={<CancelIcon />}
-							label="Rejected"
-							color="error"
-							variant="outlined"
-							size="small"
-							sx={{ fontWeight: 700 }}
-						/>
-					);
-				}
-				if (s.includes("sent")) {
-					return (
-						<Chip
-							icon={<SendIcon />}
-							label="Sent"
-							color="warning"
-							variant="outlined"
-							size="small"
-							sx={{ fontWeight: 700 }}
-						/>
-					);
-				}
-				return (
-					<Chip
-						icon={<DraftsIcon />}
-						label="Draft"
-						color="warning"
-						variant="outlined"
-						size="small"
-						sx={{ fontWeight: 700 }}
-					/>
-				);
+				return renderStatusChip(value ?? row?.status);
 			}) as any,
 		},
 		{
@@ -266,7 +293,7 @@ export default function QuotationPage({ dealerId, limit }: Props) {
 		},
 	];
 
-	const gridRows = useMemo(() => filtered.map((d) => ({ id: d.quote_id, ...d })), [filtered]);
+	const gridRows = useMemo(() => paginatedFiltered.map((d) => ({ id: d.quote_id, ...d })), [paginatedFiltered]);
 
 	/* ---------------- render ---------------- */
 	return (
@@ -334,7 +361,11 @@ export default function QuotationPage({ dealerId, limit }: Props) {
 						loading={loading}
 						disableColumnMenu
 						rowSelection={false}
-						hideFooter
+						pagination
+						paginationModel={paginationModel}
+						onPaginationModelChange={setPaginationModel}
+						pageSizeOptions={[20, 50, 100]}
+						rowCount={filtered.length}
 						slots={{ toolbar: GridToolbar }}
 						slotProps={{ toolbar: { showQuickFilter: false } }}
 						columnHeaderHeight={52}
@@ -364,74 +395,85 @@ export default function QuotationPage({ dealerId, limit }: Props) {
 						autoHeight={gridRows.length <= 14}
 					/>
 				) : (
-					<Box
-						sx={{
-							overflowY: "auto",
-							height: "100%",
-							pr: 0.5,
-							"&::-webkit-scrollbar": { width: 6 },
-							"&::-webkit-scrollbar-thumb": {
-								background: theme.palette.grey[400],
-								borderRadius: 3,
-							},
-						}}
-					>
-						<Grid container spacing={1}>
-							{filtered.map((d) => (
-								<Grid item xs={12} key={d.quote_id}>
-									<Card variant="outlined" sx={{ borderRadius: 2 }}>
-										<CardContent sx={{ py: 1.25 }}>
-											<Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
-												<Avatar sx={{ width: 32, height: 32, mr: 1, bgcolor: "primary.main" }}>
-													{d.quote_id.toString()?.[0] ?? "?"}
-												</Avatar>
-												<Box sx={{ minWidth: 0, flex: 1 }}>
-													<Typography fontWeight={700} noWrap title={d.quote_id.toString()}>
-														{d.quote_id}
-													</Typography>
-													<Typography variant="caption" color="text.secondary" noWrap>
-														{d.dealer_name ?? d.dealer_id ?? "-"}
-													</Typography>
+					<>
+						<Box
+							sx={{
+								overflowY: "auto",
+								height: "100%",
+								pr: 0.5,
+								"&::-webkit-scrollbar": { width: 6 },
+								"&::-webkit-scrollbar-thumb": {
+									background: theme.palette.grey[400],
+									borderRadius: 3,
+								},
+							}}
+						>
+							<Grid container spacing={1}>
+								{paginatedFiltered.map((d) => (
+									<Grid item xs={12} key={d.quote_id}>
+										<Card variant="outlined" sx={{ borderRadius: 2 }}>
+											<CardContent sx={{ py: 1.25 }}>
+												<Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+													<Avatar sx={{ width: 32, height: 32, mr: 1, bgcolor: "primary.main" }}>
+														{d.quote_id.toString()?.[0] ?? "?"}
+													</Avatar>
+													<Box sx={{ minWidth: 0, flex: 1 }}>
+														<Typography fontWeight={700} noWrap title={d.quote_id.toString()}>
+															{d.quote_id}
+														</Typography>
+														<Typography variant="caption" color="text.secondary" noWrap>
+															{d.dealer_name ?? d.dealer_id ?? "-"}
+														</Typography>
+													</Box>
+													{renderStatusChip(d.status)}
 												</Box>
-												<Chip size="small" label={String(d.status ?? "Draft")} variant="outlined" />
-											</Box>
 
-											<Grid container spacing={1}>
-												<Grid item xs={6}>
-													<Typography variant="caption" color="text.secondary">
-														Date
-													</Typography>
-													<Typography variant="body2">{safeDate(d.date_created)}</Typography>
+												<Grid container spacing={1}>
+													<Grid item xs={6}>
+														<Typography variant="caption" color="text.secondary">
+															Date
+														</Typography>
+														<Typography variant="body2">{safeDate(d.date_created)}</Typography>
+													</Grid>
+													<Grid item xs={6}>
+														<Typography variant="caption" color="text.secondary">
+															Total
+														</Typography>
+														<Typography variant="body2">{toINR(d.total_price)}</Typography>
+													</Grid>
 												</Grid>
-												<Grid item xs={6}>
-													<Typography variant="caption" color="text.secondary">
-														Total
-													</Typography>
-													<Typography variant="body2">{toINR(d.total_price)}</Typography>
-												</Grid>
-											</Grid>
 
-											<Box sx={{ mt: 1, display: "flex", gap: 0.5, justifyContent: "flex-end" }}>
-												<Tooltip title="View">
-													<IconButton
-														size="small"
-														onClick={() => navigate(`/quotation-items/${d.quote_id}`)}
-													>
-														<VisibilityIcon fontSize="small" />
-													</IconButton>
-												</Tooltip>
-												<Tooltip title="Delete">
-													<IconButton size="small" color="error" onClick={() => handleDelete(d)}>
-														<DeleteIcon fontSize="small" />
-													</IconButton>
-												</Tooltip>
-											</Box>
-										</CardContent>
-									</Card>
-								</Grid>
-							))}
-						</Grid>
-					</Box>
+												<Box sx={{ mt: 1, display: "flex", gap: 0.5, justifyContent: "flex-end" }}>
+													<Tooltip title="View">
+														<IconButton
+															size="small"
+															onClick={() => navigate(`/quotation-items/${d.quote_id}`)}
+														>
+															<VisibilityIcon fontSize="small" />
+														</IconButton>
+													</Tooltip>
+													<Tooltip title="Delete">
+														<IconButton size="small" color="error" onClick={() => handleDelete(d)}>
+															<DeleteIcon fontSize="small" />
+														</IconButton>
+													</Tooltip>
+												</Box>
+											</CardContent>
+										</Card>
+									</Grid>
+								))}
+							</Grid>
+						</Box>
+						<TablePagination
+							component="div"
+							count={filtered.length}
+							page={paginationModel.page}
+							onPageChange={(e, newPage) => setPaginationModel(prev => ({ ...prev, page: newPage }))}
+							rowsPerPage={paginationModel.pageSize}
+							onRowsPerPageChange={(e) => setPaginationModel(prev => ({ ...prev, pageSize: parseInt(e.target.value, 10), page: 0 }))}
+							rowsPerPageOptions={[20, 50, 100]}
+						/>
+					</>
 				)}
 			</Box>
 		</Paper>
