@@ -13,7 +13,22 @@ module.exports = function (db) {
           console.error('DB Error:', err);
           return res.status(500).json({ error: 'Database error' });
         }
-        res.json(results);
+
+        // Fetch all alternate phones for the tenant
+        db.query('SELECT dealer_id, alt_phone FROM ro_cpq.dealer_phone WHERE dealer_id IN (?)', [results.map(d => d.dealer_id)], (err, altPhones) => {
+          if (err) {
+            console.error('Alternate Phone Fetch Error:', err);
+            return res.status(500).json({ error: 'Failed to fetch alternate phones' });
+          }
+
+          // Map alternate phones to dealers
+          const dealersWithAltPhones = results.map(dealer => ({
+            ...dealer,
+            alternate_phones: altPhones.filter(p => p.dealer_id === dealer.dealer_id).map(p => p.alt_phone)
+          }));
+
+          res.json(dealersWithAltPhones);
+        });
       }
     );
   });
@@ -32,7 +47,18 @@ module.exports = function (db) {
       if (results.length === 0) {
         return res.status(404).json({ error: 'Dealer not found' });
       }
-      res.json(results[0]);
+
+      const dealer = results[0];
+
+      db.query('SELECT alt_phone FROM ro_cpq.dealer_phone WHERE dealer_id = ?', [id], (err, altPhones) => {
+        if (err) {
+          console.error('Alternate Phone Fetch Error:', err);
+          return res.status(500).json({ error: 'Failed to fetch alternate phones' });
+        }
+
+        dealer.alternate_phones = altPhones.map(p => p.alt_phone);
+        res.json(dealer);
+      });
     });
   });
 
@@ -65,7 +91,26 @@ module.exports = function (db) {
           console.error('Insert Error:', err);
           return res.status(500).json({ error: 'Insert failed' });
         }
-        res.json({ dealer_id: result.insertId });
+
+        const dealer_id = result.insertId;
+        const { alternate_phones } = req.body;
+
+        if (alternate_phones && alternate_phones.length > 0) {
+          const alternatePhonesValues = alternate_phones.map(alt_phone => [dealer_id, alt_phone]);
+          db.query(
+            'INSERT INTO ro_cpq.dealer_phone (dealer_id, alt_phone) VALUES ?',
+            [alternatePhonesValues],
+            (err) => {
+              if (err) {
+                console.error('Alternate Phone Insert Error:', err);
+                // Even if alternate phones fail, the dealer is created.
+                // Decide on your error handling strategy: rollback or just warn.
+              }
+            }
+          );
+        }
+
+        res.json({ dealer_id });
       }
     );
   });
@@ -85,7 +130,31 @@ module.exports = function (db) {
           console.error('Update Error:', err);
           return res.status(500).json({ error: 'Update failed' });
         }
-        res.json({ message: 'Dealer updated successfully' });
+
+        const { alternate_phones } = req.body;
+
+        db.query('DELETE FROM ro_cpq.dealer_phone WHERE dealer_id = ?', [id], (err) => {
+          if (err) {
+            console.error('Alternate Phone Delete Error:', err);
+            return res.status(500).json({ error: 'Failed to update alternate phones' });
+          }
+
+          if (alternate_phones && alternate_phones.length > 0) {
+            const alternatePhonesValues = alternate_phones.map(alt_phone => [id, alt_phone]);
+            db.query(
+              'INSERT INTO ro_cpq.dealer_phone (dealer_id, alt_phone) VALUES ?',
+              [alternatePhonesValues],
+              (err) => {
+                if (err) {
+                  console.error('Alternate Phone Insert Error:', err);
+                  return res.status(500).json({ error: 'Failed to insert alternate phones' });
+                }
+              }
+            );
+          }
+
+          res.json({ message: 'Dealer updated successfully' });
+        });
       }
     );
   });

@@ -60,6 +60,7 @@ type Dealer = {
   dealer_type?: string;
   account_type?: string;
   gst_number?: string;
+  alternate_phones?: string[];
 };
 
 type DealerForm = {
@@ -71,6 +72,7 @@ type DealerForm = {
   account_type?: string;
   gst_number?: string;
   is_important?: boolean;
+  alternate_phones?: string[];
 };
 
 /** API helpers */
@@ -118,6 +120,7 @@ export default function Contact() {
 		account_type: "",
 		gst_number: "",
 		is_important: false,
+		alternate_phones: [],
 	};
 	const [form, setForm] = useState<DealerForm>(emptyForm);
 	const [saving, setSaving] = useState(false);
@@ -176,6 +179,7 @@ export default function Contact() {
 			account_type: d.account_type ?? "",
 			gst_number: d.gst_number ?? "",
 			is_important: Number(d.is_important) === 1 || d.is_important === true,
+			alternate_phones: d.alternate_phones || [],
 		});
 		setFormOpen(true);
 	};
@@ -257,6 +261,7 @@ export default function Contact() {
 			const payload: DealerForm = {
 				...form,
 				is_important: !!form.is_important,
+				alternate_phones: form.alternate_phones || [],
 			};
 
 			if (formMode === "create") {
@@ -352,23 +357,32 @@ export default function Contact() {
 					</Typography>
 				</Box>
 			),
-		},
+		      },
 		{
 			field: "phone",
 			headerName: "Phone",
 			flex: 1,
 			minWidth: 140,
 			editable: true,
-			renderCell: (p) => (
-				<Box sx={{ display: "flex", alignItems: "center", minWidth: 0 }}>
-					<PhoneIcon sx={{ fontSize: 14, mr: 0.5, color: "text.secondary" }} />
-					<Typography variant="body2" noWrap title={String(p.value ?? "")}>
-						{p.value}
-					</Typography>
-				</Box>
-			),
-		},
-		{
+			renderCell: (p) => {
+				const d = p.row as Dealer;
+				return (
+					<Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-start", minWidth: 0 }}>
+						<Box sx={{ display: "flex", alignItems: "center" }}>
+							<PhoneIcon sx={{ fontSize: 14, mr: 0.5, color: "text.secondary" }} />
+							<Typography variant="body2" noWrap title={String(d.phone ?? "")}>
+								{d.phone}
+							</Typography>
+						</Box>
+						{d.alternate_phones && d.alternate_phones.length > 0 && (
+							<Typography variant="caption" color="text.secondary" noWrap>
+								{d.alternate_phones.join(", ")}
+							</Typography>
+						)}
+					</Box>
+				);
+			},
+		},		{
 			field: "location",
 			headerName: "Location",
 			flex: 1.1,
@@ -611,6 +625,14 @@ export default function Contact() {
 															{d.phone}
 														</Typography>
 													</Box>
+													{d.alternate_phones && d.alternate_phones.length > 0 && (
+														<Box sx={{ display: "flex", alignItems: "center", mb: 0.5 }}>
+															<PhoneIcon sx={{ fontSize: 14, mr: 0.5, color: "text.secondary" }} />
+															<Typography variant="body2" color="text.secondary" noWrap>
+																{d.alternate_phones.join(", ")}
+															</Typography>
+														</Box>
+													)}
 													<Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
 														<PlaceIcon sx={{ fontSize: 14, mr: 0.5, color: "text.secondary" }} />
 														<Typography variant="body2" noWrap title={d.location}>
@@ -745,6 +767,44 @@ export default function Contact() {
 							/>
 						</Grid>
 					</Grid>
+
+					<Divider sx={{ my: 2 }} />
+
+					<Typography variant="h6" gutterBottom>Alternate Phone Numbers</Typography>
+					{form.alternate_phones?.map((phone, index) => (
+						<Grid container spacing={2} key={index} sx={{ mb: 1 }}>
+							<Grid item xs={10}>
+								<TextField
+									fullWidth
+									label={`Alternate Phone ${index + 1}`}
+									value={phone}
+									onChange={(e) => {
+										const newPhones = [...(form.alternate_phones || [])];
+										newPhones[index] = e.target.value;
+										setForm(f => ({ ...f, alternate_phones: newPhones }));
+									}}
+								/>
+							</Grid>
+							<Grid item xs={2}>
+								<IconButton onClick={() => {
+									const newPhones = [...(form.alternate_phones || [])];
+									newPhones.splice(index, 1);
+									setForm(f => ({ ...f, alternate_phones: newPhones }));
+								}}>
+									<DeleteIcon />
+								</IconButton>
+							</Grid>
+						</Grid>
+					))}
+					<Button
+						startIcon={<AddIcon />}
+						onClick={() => {
+							const newPhones = [...(form.alternate_phones || []), ''];
+							setForm(f => ({ ...f, alternate_phones: newPhones }));
+						}}
+					>
+						Add Phone
+					</Button>
 
 					{formMode === "edit" && selected && (
 						<>
