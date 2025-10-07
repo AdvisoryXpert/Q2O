@@ -6,31 +6,41 @@ module.exports = function (db) {
 
   // GET all dealers (tenant)
   router.get('/', (req, res) => {
-    db.query('SELECT * FROM ro_cpq.dealer WHERE tenant_id = ? ORDER BY dealer_id DESC',
-      [req.tenant_id],
-      (err, results) => {
+    const page = parseInt(req.query.page) || 1;
+    const pageSize = parseInt(req.query.pageSize) || 10;
+    const offset = (page - 1) * pageSize;
+
+    const countQuery = 'SELECT COUNT(*) as count FROM ro_cpq.dealer WHERE tenant_id = ?';
+    db.query(countQuery, [req.tenant_id], (err, countResult) => {
+      if (err) {
+        console.error('DB Error:', err);
+        return res.status(500).json({ error: 'Database error' });
+      }
+
+      const totalRows = countResult[0].count;
+
+      const dataQuery = 'SELECT * FROM ro_cpq.dealer WHERE tenant_id = ? ORDER BY dealer_id DESC LIMIT ? OFFSET ?';
+      db.query(dataQuery, [req.tenant_id, pageSize, offset], (err, results) => {
         if (err) {
           console.error('DB Error:', err);
           return res.status(500).json({ error: 'Database error' });
         }
 
-        // Fetch all alternate phones for the tenant
         db.query('SELECT dealer_id, alt_phone FROM ro_cpq.dealer_phone WHERE dealer_id IN (?)', [results.map(d => d.dealer_id)], (err, altPhones) => {
           if (err) {
             console.error('Alternate Phone Fetch Error:', err);
             return res.status(500).json({ error: 'Failed to fetch alternate phones' });
           }
 
-          // Map alternate phones to dealers
           const dealersWithAltPhones = results.map(dealer => ({
             ...dealer,
             alternate_phones: altPhones.filter(p => p.dealer_id === dealer.dealer_id).map(p => p.alt_phone)
           }));
 
-          res.json(dealersWithAltPhones);
+          res.json({ rows: dealersWithAltPhones, totalRows });
         });
-      }
-    );
+      });
+    });
   });
 
   // GET dealer by ID (tenant)

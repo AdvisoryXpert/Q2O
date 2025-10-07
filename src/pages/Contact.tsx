@@ -76,9 +76,9 @@ type DealerForm = {
 };
 
 /** API helpers */
-async function fetchDealers(): Promise<Dealer[]> {
-	const { data } = await http.get("/dealers");
-	return data ?? [];
+async function fetchDealers(page: number, pageSize: number): Promise<{ rows: Dealer[], totalRows: number }> {
+	const { data } = await http.get("/dealers", { params: { page, pageSize } });
+	return data ?? { rows: [], totalRows: 0 };
 }
 async function createDealer(payload: DealerForm): Promise<Dealer> {
 	const { data } = await http.post("/dealers", payload);
@@ -132,11 +132,16 @@ export default function Contact() {
 		type: "success",
 	});
 
+	const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 10 });
+	const [totalRows, setTotalRows] = useState(0);
+
 	useEffect(() => {
 		(async () => {
 			try {
 				setLoading(true);
-				setRows(await fetchDealers());
+				const { rows, totalRows } = await fetchDealers(paginationModel.page + 1, paginationModel.pageSize);
+				setRows(rows);
+				setTotalRows(totalRows);
 				setError(null);
 			} catch {
 				setError("Failed to load dealers.");
@@ -144,7 +149,7 @@ export default function Contact() {
 				setLoading(false);
 			}
 		})();
-	}, []);
+	}, [paginationModel]);
 
 	/** Search filter */
 	const filtered = useMemo(() => {
@@ -550,7 +555,10 @@ export default function Contact() {
 							onProcessRowUpdateError={(err) => console.error(err)}
 							disableColumnMenu
 							rowSelection={false}
-							hideFooter
+							paginationMode="server"
+							rowCount={totalRows}
+							paginationModel={paginationModel}
+							onPaginationModelChange={setPaginationModel}
 							slots={{ toolbar: GridToolbar }}
 							slotProps={{ toolbar: { showQuickFilter: false } }}
 							columnHeaderHeight={52}
