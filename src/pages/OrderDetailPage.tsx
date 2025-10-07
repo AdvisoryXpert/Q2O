@@ -180,17 +180,7 @@ export default function OrderDetailPage() {
 				})),
 			};
 			// Adjust path if needed (e.g., /api/warranty/)
-			await http.post(`/warranty`, payload);
-
-			// Also update the quote status to Finalized
-			if (order.quote_id) {
-				try {
-					await http.put(`/quotation/${order.quote_id}/status`, { status: "Finalized" });
-				} catch (e) {
-					console.error("Failed to finalize quote", e);
-					// Non-fatal, so we don't show an error to the user
-				}
-			}
+			await http.post(`/warranty`, payload);			
 
 			setSnack({ open: true, msg: "✅ Order dispatched and warranties created!", type: "success" });
 		} catch (e: any) {

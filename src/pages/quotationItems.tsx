@@ -107,7 +107,25 @@ const QuotationItems = () => {
 	const [tenant, setTenant] = useState<Tenant | null>(null);
 	const [user, setUser] = useState<User | null>(null);
 	const [showWhatsAppOptions, setShowWhatsAppOptions] = useState(false);
+	const [isFinalized, setIsFinalized] = useState(false);
 	const navigate = useNavigate();
+
+	useEffect(() => {
+		if (quoteId) {
+			setIsFinalized(false); // Reset the state
+			http.get(`/quotation/${quoteId}`)
+				.then(res => {
+					if (res.data.status === 'Finalized') {
+						setIsFinalized(true);
+					}
+				})
+				.catch(err => {
+					if (err.response && err.response.status !== 404) {
+						console.error("Failed to fetch quotation status:", err);
+					}
+				});
+		}
+	}, [quoteId]);
 
 	useEffect(() => {
 		const token = localStorage.getItem("token");
@@ -675,6 +693,8 @@ const QuotationItems = () => {
 			const dispatchResult = dispatchResponse.data;
 
 			if (dispatchResponse.status === 200 || dispatchResponse.status === 201) {
+				await http.put(`/quotation/${quoteId}/status`, { status: 'Finalized' });
+				setIsFinalized(true);
 				navigate(`/Order-Line-Items/${dispatchResult.order_id}`);
 			} else {
 				alert(`❌ Dispatch Failed: ${dispatchResult.error || "Unknown error"}`);
@@ -734,7 +754,7 @@ const QuotationItems = () => {
 									<Select
 										value={cell.getValue() || ""}
 										onChange={(e) => handleAttributeChange(row, e.target.value)}
-										disabled={row.original.is_manual_override || isLoading}
+										disabled={row.original.is_manual_override || isLoading || isFinalized}
 									>
 										{options.map((opt) => (
 											<MenuItem key={opt.attribute_id} value={opt.name}>
@@ -779,6 +799,7 @@ const QuotationItems = () => {
 							onChange={handleChange}
 							inputProps={{ min: 1 }}
 							sx={{ width: '80px' }}
+							disabled={isFinalized}
 						/>
 					);
 				},
@@ -794,7 +815,7 @@ const QuotationItems = () => {
 						<Button
 							variant="outlined"
 							size="small"
-							disabled={isLoading}
+							disabled={isLoading || isFinalized}
 							onClick={() => togglePriceOverride(item.quote_item_id)}
 						>
 							{item.is_manual_override ? "Reset to System" : "Set Manual Price"}
@@ -842,7 +863,7 @@ const QuotationItems = () => {
 								size="small"
 								type="number"
 								fullWidth
-								disabled={!item.is_manual_override || isLoading}
+								disabled={!item.is_manual_override || isLoading || isFinalized}
 								value={currentValue}
 								onChange={handleChange}
 								onBlur={handleBlur}
@@ -879,7 +900,7 @@ const QuotationItems = () => {
 				Cell: ({ cell }) => `₹${cell.getValue<number>().toFixed(2)}`,
 			},
 		],
-		[items, attributeOptionsMap, invalidItems, loadingRows],
+		[items, attributeOptionsMap, invalidItems, loadingRows, isFinalized],
 	);
 
 	return (
@@ -921,7 +942,7 @@ const QuotationItems = () => {
 				<MaterialReactTable
 					columns={columns}
 					data={items}
-					enableRowSelection
+					enableRowSelection={!isFinalized}
 					state={{ rowSelection, pagination }}
 					onPaginationChange={setPagination}
 					getRowId={(row) => `${row.quote_item_id}`}
@@ -941,7 +962,7 @@ const QuotationItems = () => {
 						variant="contained" 
 						color="success" 
 						onClick={handleSubmit}
-						disabled={invalidItems.size > 0}
+						disabled={invalidItems.size > 0 || isFinalized}
 					>
 						Save Quotation
 					</Button>
@@ -949,14 +970,14 @@ const QuotationItems = () => {
 						variant="contained"
 						color="secondary"
 						onClick={handleDispatchOrder}
-						disabled={invalidItems.size > 0}
+						disabled={invalidItems.size > 0 || isFinalized}
 					>
 						Dispatch Order
 					</Button>
 					<Button
 						variant="contained"
 						color="primary"
-						disabled={invalidItems.size > 0}
+						disabled={invalidItems.size > 0 || isFinalized}
 						onClick={() => setShowPDFOptions(true)}
 					>
 						Download PDF
@@ -964,7 +985,7 @@ const QuotationItems = () => {
 					<Button
 						variant="contained"
 						color="success"
-						disabled={invalidItems.size > 0 || !dealerContact}
+						disabled={invalidItems.size > 0 || !dealerContact || isFinalized}
 						onClick={() => setShowWhatsAppOptions(true)}
 					>
 						Send to WhatsApp
@@ -977,6 +998,7 @@ const QuotationItems = () => {
 						theme="snow"
 						value={noteContent}
 						onChange={setNoteContent}
+						readOnly={isFinalized}
 						style={{
 							height: "200px",
 							marginBottom: "20px",
@@ -984,7 +1006,7 @@ const QuotationItems = () => {
 						}}
 					/>
 					<Box sx={{ display: "flex", justifyContent: "center", gap: 3, mt: 10 }}>          
-						<Button variant="contained" onClick={saveNote}>
+						<Button variant="contained" onClick={saveNote} disabled={isFinalized}>
 							Save Note
 						</Button>
 					</Box>
