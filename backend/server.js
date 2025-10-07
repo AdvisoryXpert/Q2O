@@ -217,6 +217,10 @@ app.use('/api', chatbotAnalytics);
 const analyticsRoutes = require('./routes/analyticsRoutes')(db);
 app.use('/api/analytics', analyticsRoutes);
 
+// Quotation
+const quotationRouter = require('./routes/quotation')(db);
+app.use('/api/quotation', quotationRouter);
+
 // Quotation Items (was GET /quotation-items/:quote_id → move under /api)
 app.get('/api/quotation-items/:quote_id', (req, res) => {
   const { quote_id } = req.params;

@@ -68,6 +68,7 @@ module.exports = function (db) {
     const query = `
       SELECT 
         o.order_id,
+        o.quote_id,
         o.dealer_id,
         d.full_name as dealer_name,
         o.date_created,

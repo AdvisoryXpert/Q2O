@@ -27,5 +27,30 @@ module.exports = (db) => {
 		});
 	});
 
+	router.put('/:quote_id/status', (req, res) => {
+		const { quote_id } = req.params;
+		const { status } = req.body;
+		const tenant_id = req.tenant_id;
+
+		if (!status) {
+			return res.status(400).json({ error: 'New status is required' });
+		}
+
+		db.query(
+			'UPDATE ro_cpq.quotation SET status = ? WHERE quote_id = ? AND tenant_id = ?',
+			[status, quote_id, tenant_id],
+			(err, result) => {
+				if (err) {
+					console.error('Error updating quotation status:', err);
+					return res.status(500).json({ error: 'Failed to update quotation status' });
+				}
+				if (result.affectedRows === 0) {
+					return res.status(404).json({ error: 'Quotation not found or no changes made' });
+				}
+				res.json({ message: 'Quotation status updated successfully' });
+			}
+		);
+	});
+
 	return router;
 };
