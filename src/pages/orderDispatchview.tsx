@@ -14,7 +14,7 @@ import {
 	Toolbar,
 } from '@mui/material';
 import { http } from '../lib/http'; 
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 
 const OrderDispatchView = () => {
 	const { orderId } = useParams();
@@ -24,6 +24,7 @@ const OrderDispatchView = () => {
 	const [, setError] = useState<string>('');
 	const [page, setPage] = useState(0);
 	const [rowsPerPage, setRowsPerPage] = useState(5);
+	const navigate = useNavigate();
 
 	useEffect(() => {
 		const fetchOrderDetails = async () => {
@@ -171,7 +172,8 @@ const OrderDispatchView = () => {
 			<Button
 				variant="contained"
 				sx={{ mt: 4 }}
-				onClick={() => window.history.back()}
+				onClick={() => navigate(`/quotation-items/${orderHeader.quote_id}`)}
+				disabled={!orderHeader}
 			>
 				Back to Quotes
 			</Button>
