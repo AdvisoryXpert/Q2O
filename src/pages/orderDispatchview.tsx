@@ -177,6 +177,13 @@ const OrderDispatchView = () => {
 			>
 				Back to Quotes
 			</Button>
+			<Button
+				variant="contained"
+				sx={{ mt: 4, ml: 2 }}
+				onClick={() => navigate(`/orders/${orderId}`)}
+			>
+				Go To Order
+			</Button>
 		</Box>
 	);
 };
