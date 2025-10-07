@@ -15,7 +15,7 @@ module.exports = (db) => {
 			FROM ro_cpq.quotation q
 			JOIN ro_cpq.dealer d ON q.dealer_id = d.dealer_id
 			LEFT JOIN ro_cpq.users u ON q.user_id = u.user_id
-			WHERE d.phone = ? AND q.tenant_id = ?
+			WHERE d.phone = ? AND q.tenant_id = ? and q.status = 'Draft'
 			ORDER BY q.date_created DESC;
 		`;
 
