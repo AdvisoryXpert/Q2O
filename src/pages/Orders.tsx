@@ -29,6 +29,11 @@ import {
 	DataGrid,
 	GridColDef,
 	GridRowModel,
+	GridToolbarContainer,
+	GridToolbarColumnsButton,
+	GridToolbarFilterButton,
+	GridToolbarDensitySelector,
+	GridToolbarExport,
 } from "@mui/x-data-grid";
 import SearchIcon from "@mui/icons-material/Search";
 import FilterListIcon from "@mui/icons-material/FilterList";
@@ -64,18 +69,29 @@ type Dealer = { dealer_id: number; full_name: string };
 /* -------------------- API helpers -------------------- */
 async function fetchOrders(): Promise<Order[]> {
 	try {
-		//const { data } = await http.get("/orders");
-		//return data ?? [];
+		// const { data } = await http.get("/orders");
+		// return Array.isArray(data) ? data : [];
 		const { data } = await http.get("/recentorders");
-		return data ?? [];
-	} catch {
-		
+		return Array.isArray(data) ? data : [];
+	} catch (err) {
+		console.error("Failed to fetch orders:", err);
+		return [];
 	}
 }
+
+// Normalizes /dealers response whether API returns an array or { data: [...] }
 async function fetchDealers(): Promise<Dealer[]> {
-	const { data } = await http.get("/dealers");
-	return data ?? [];
+	try {
+		const { data } = await http.get("/dealers");
+		if (Array.isArray(data)) return data as Dealer[];
+		if (Array.isArray((data as any)?.data)) return (data as any).data as Dealer[];
+		return [];
+	} catch (err) {
+		console.error("Failed to fetch dealers:", err);
+		return [];
+	}
 }
+
 async function createOrder(payload: OrderForm): Promise<Order> {
 	const { data } = await http.post("/orders", payload);
 	return data;
@@ -93,7 +109,7 @@ const toINR = (n?: number | null) =>
 		? n.toLocaleString("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 })
 		: "-";
 
-const STATUS_OPTIONS = ["Draft", "For Dispatch", "Dispatched", "Invoiced", "Closed"];
+const STATUS_OPTIONS = ["Draft", "For Dispatch", "Dispatched", "Invoiced", "Closed"] as const;
 
 /* -------------------- Custom Toolbar (no QuickFilter) -------------------- */
 function OrdersToolbar() {
@@ -121,11 +137,13 @@ export default function OrdersPage() {
 
 	// ui state
 	const [search, setSearch] = useState("");
-	const [snack, setSnack] = useState<{ open: boolean; msg: string; type: "success" | "error" }>({
-		open: false,
-		msg: "",
-		type: "success",
-	});
+	const [snack, setSnack] = useState<{ open: boolean; msg: string; type: "success" | "error" }>(
+		{
+			open: false,
+			msg: "",
+			type: "success",
+		}
+	);
 
 	// form/dialog
 	const [formOpen, setFormOpen] = useState(false);
@@ -141,10 +159,11 @@ export default function OrdersPage() {
 			try {
 				setLoading(true);
 				const [o, d] = await Promise.all([fetchOrders(), fetchDealers()]);
-				setRows(o);
-				setDealers(d);
+				setRows(Array.isArray(o) ? o : []);
+				setDealers(Array.isArray(d) ? d : []);
 				setError(null);
-			} catch {
+			} catch (e) {
+				console.error(e);
 				setError("Failed to load orders.");
 			} finally {
 				setLoading(false);
@@ -154,7 +173,8 @@ export default function OrdersPage() {
 
 	const getDealerName = (id?: number | null) => {
 		if (id == null) return "-";
-		return dealers.find((x) => x.dealer_id === id)?.full_name || String(id);
+		const list = Array.isArray(dealers) ? dealers : [];
+		return list.find((x) => x.dealer_id === id)?.full_name || String(id);
 	};
 
 	/* ---------- Search ---------- */
@@ -305,15 +325,15 @@ export default function OrdersPage() {
 			renderCell: (p) => {
 				const v = (p?.value as string) ?? "-";
 				const color =
-          v === "For Dispatch"
-          	? "warning"
-          	: v === "Dispatched"
-          		? "info"
-          		: v === "Invoiced"
-          			? "secondary"
-          			: v === "Closed"
-          				? "success"
-          				: "default";
+					v === "For Dispatch"
+						? "warning"
+						: v === "Dispatched"
+							? "info"
+							: v === "Invoiced"
+								? "secondary"
+								: v === "Closed"
+									? "success"
+									: "default";
 				return (
 					<Chip
 						size="small"
@@ -455,7 +475,7 @@ export default function OrdersPage() {
 								"& .MuiDataGrid-columnHeaders": {
 									fontWeight: 800,
 									background:
-                    "linear-gradient(90deg, rgba(7,71,166,0.07) 0%, rgba(7,71,166,0.03) 100%)",
+										"linear-gradient(90deg, rgba(7,71,166,0.07) 0%, rgba(7,71,166,0.03) 100%)",
 								},
 								"& .MuiDataGrid-columnHeaderTitle": { fontWeight: 800 },
 								"& .MuiDataGrid-cell": {
@@ -578,7 +598,7 @@ export default function OrdersPage() {
 								onChange={(e) => setForm((f) => ({ ...f, dealer_id: Number(e.target.value) || "" }))}
 							>
 								<option value=""></option>
-								{dealers.map((d) => (
+								{Array.isArray(dealers) && dealers.map((d) => (
 									<option key={d.dealer_id} value={d.dealer_id}>
 										{d.full_name}
 									</option>
