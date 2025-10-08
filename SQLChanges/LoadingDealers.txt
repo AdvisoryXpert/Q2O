@@ -1,0 +1,97 @@
+-- 1) STAGING TABLES (run once)
+CREATE TABLE IF NOT EXISTS ro_cpq.dealer_staging (
+  dealer_name   VARCHAR(255),
+  location      VARCHAR(255),
+  email         VARCHAR(255),
+  phone         VARCHAR(20),
+  dealer_type   ENUM('Dealer','Individual') DEFAULT 'Dealer',
+  account_type  VARCHAR(50),
+  status        VARCHAR(50)
+);
+
+DROP TABLE IF EXISTS ro_cpq.dealer_phone_staging;
+CREATE TABLE ro_cpq.dealer_phone_staging (
+  primary_phone VARCHAR(20),
+  alt_phone     VARCHAR(20),
+  phone_label   VARCHAR(50)
+) CHARACTER SET utf8mb4;
+
+
+-- 2) LOAD CSVs (NO LOCAL; use the secure_file_priv path)
+LOAD DATA INFILE 'C:/ProgramData/MySQL/MySQL Server 8.0/Uploads/dealers_cleaned.csv'
+INTO TABLE ro_cpq.dealer_staging
+FIELDS TERMINATED BY ',' ENCLOSED BY '"'
+LINES TERMINATED BY '\r\n'
+IGNORE 1 LINES
+(dealer_name, location, email, phone, dealer_type, account_type, status);
+
+LOAD DATA INFILE 'C:/ProgramData/MySQL/MySQL Server 8.0/Uploads/dealer_phone_cleaned.csv'
+INTO TABLE ro_cpq.dealer_phone_staging
+CHARACTER SET utf8mb4
+FIELDS TERMINATED BY ',' OPTIONALLY ENCLOSED BY '"'
+LINES TERMINATED BY '\r\n'
+IGNORE 1 LINES
+(primary_phone, alt_phone, phone_label)
+SET
+  primary_phone = TRIM(BOTH '\r' FROM primary_phone),
+  alt_phone     = TRIM(BOTH '\r' FROM alt_phone),
+  phone_label   = TRIM(BOTH '\r' FROM phone_label);
+
+-- 3) INSERT UNIQUE DEALERS INTO MAIN TABLE
+-- (tenant_id=1 here; change if needed)
+INSERT INTO ro_cpq.dealer
+  (tenant_id, full_name, location, email, phone, dealer_type, account_type)
+SELECT
+  1 AS tenant_id,
+  CASE
+    WHEN t.tname = '' THEN CONCAT('Dealer ', t.phone)
+    -- no existing dealer with this name AND this is the first row for this name in this batch
+    WHEN d2.dealer_id IS NULL AND t.rn = 1 THEN t.tname
+    -- otherwise append phone (and a counter for 2nd, 3rd, … in this batch)
+    ELSE CONCAT(t.tname, ' [', t.phone, IF(t.rn > 1, CONCAT('-', t.rn - 1), ''), ']')
+  END AS full_name,
+  t.location,
+  t.email,
+  t.phone,
+  CASE
+    WHEN LOWER(TRIM(COALESCE(t.dealer_type, ''))) = 'individual' THEN 'Individual'
+    ELSE 'Dealer'
+  END AS dealer_type,
+  t.account_type
+FROM (
+  SELECT
+    TRIM(s.dealer_name) AS tname,
+    s.location,
+    s.email,
+    s.phone,
+    s.dealer_type,
+    s.account_type,
+    ROW_NUMBER() OVER (PARTITION BY TRIM(s.dealer_name) ORDER BY s.phone) AS rn
+  FROM ro_cpq.dealer_staging s
+  WHERE s.dealer_name IS NOT NULL AND s.dealer_name <> ''
+    AND s.phone IS NOT NULL AND s.phone <> ''
+    AND NOT EXISTS (
+      SELECT 1 FROM ro_cpq.dealer d
+      WHERE d.tenant_id = 1 AND d.phone = s.phone
+    )
+) AS t
+LEFT JOIN ro_cpq.dealer d2
+  ON d2.tenant_id = 1 AND d2.full_name = t.tname;
+
+-- 4) LINK ALTERNATE PHONES BY MATCHING PRIMARY PHONE
+INSERT INTO ro_cpq.dealer_phone (dealer_id, alt_phone, phone_label)
+SELECT d.dealer_id, s.alt_phone, s.phone_label
+FROM ro_cpq.dealer_phone_staging s
+JOIN ro_cpq.dealer d
+  ON d.phone = s.primary_phone
+WHERE s.alt_phone IS NOT NULL AND s.alt_phone <> '';
+
+-- 5) QUICK CHECKS
+SELECT COUNT(*) AS staged_dealers   FROM ro_cpq.dealer_staging;
+SELECT COUNT(*) AS staged_altphones FROM ro_cpq.dealer_phone_staging;
+SELECT COUNT(*) AS dealers_loaded   FROM ro_cpq.dealer;
+SELECT COUNT(*) AS alt_loaded       FROM ro_cpq.dealer_phone;
+
+-- 6) (OPTIONAL) CLEAN UP STAGING
+-- DROP TABLE ro_cpq.dealer_staging;
+-- DROP TABLE ro_cpq.dealer_phone_staging;
