@@ -25,11 +25,7 @@ import {
 	Snackbar,
 	Alert,
 } from "@mui/material";
-import {
-	DataGrid,
-	GridColDef,
-	GridToolbar,
-} from "@mui/x-data-grid";
+import { DataGrid, GridColDef, GridToolbar } from "@mui/x-data-grid";
 import SearchIcon from "@mui/icons-material/Search";
 import FilterListIcon from "@mui/icons-material/FilterList";
 import EditIcon from "@mui/icons-material/Edit";
@@ -40,12 +36,10 @@ import DescriptionIcon from "@mui/icons-material/Description";
 
 import { useParams } from "react-router-dom";
 import { getUserId } from "../services/AuthService";
-
-// ✅ same helper that Contact.tsx uses
 import { http } from "../lib/http";
 
 /** Types */
-type ServiceRequest = {
+export type ServiceRequest = {
   id: string;
   order_id: string;
   dealer_id: string;
@@ -57,13 +51,13 @@ type ServiceRequest = {
   notes?: string;
 };
 
-type Dealer = {
+export type Dealer = {
   dealer_id: string;
   full_name: string;
   phone?: string;
 };
 
-type OrderOption = {
+export type OrderOption = {
   order_id: string;
   invoice_id: string;
   dealer_id: string;
@@ -71,18 +65,41 @@ type OrderOption = {
 
 const generateUniqueServiceId = () => `SR-${Date.now()}`;
 
+/* --------------------- Helpers to normalize API shapes --------------------- */
+function asArray<T = any>(val: any): T[] {
+	if (Array.isArray(val)) return val as T[];
+	if (Array.isArray(val?.data)) return val.data as T[];
+	if (Array.isArray(val?.items)) return val.items as T[];
+	return [] as T[];
+}
+
 /* --------------------- API --------------------- */
 async function fetchServiceRequests(): Promise<ServiceRequest[]> {
-	const { data } = await http.get("/service-requests");
-	return data ?? [];
+	try {
+		const { data } = await http.get("/service-requests");
+		return asArray<ServiceRequest>(data);
+	} catch (e) {
+		console.error("fetchServiceRequests failed", e);
+		return [];
+	}
 }
 async function fetchDealers(): Promise<Dealer[]> {
-	const { data } = await http.get("/dealers");
-	return data ?? [];
+	try {
+		const { data } = await http.get("/dealers");
+		return asArray<Dealer>(data);
+	} catch (e) {
+		console.error("fetchDealers failed", e);
+		return [];
+	}
 }
 async function fetchOrdersBasic(): Promise<OrderOption[]> {
-	const { data } = await http.get("/orders-basic");
-	return data ?? [];
+	try {
+		const { data } = await http.get("/orders-basic");
+		return asArray<OrderOption>(data);
+	} catch (e) {
+		console.error("fetchOrdersBasic failed", e);
+		return [];
+	}
 }
 async function createSR(payload: Omit<ServiceRequest, "user_id"> & { user_id: number }) {
 	await http.post("/service-requests", payload);
@@ -127,13 +144,11 @@ export default function ServiceRequestTable() {
 	const [editNotes, setEditNotes] = useState<string>("");
 
 	// Snackbar
-	const [snack, setSnack] = useState<{ open: boolean; msg: string; type: "success" | "error" }>({
-		open: false,
-		msg: "",
-		type: "success",
-	});
+	const [snack, setSnack] = useState<{ open: boolean; msg: string; type: "success" | "error" }>(
+		{ open: false, msg: "", type: "success" }
+	);
 
-	/* Load everything (like Contact) */
+	/* Load everything */
 	const loadAll = async () => {
 		try {
 			setLoading(true);
@@ -142,19 +157,25 @@ export default function ServiceRequestTable() {
 				fetchDealers(),
 				fetchOrdersBasic(),
 			]);
+
 			const srFiltered = routeId ? sr.filter((r) => String(r.id) === String(routeId)) : sr;
-			setRows(srFiltered);
+			setRows(Array.isArray(srFiltered) ? srFiltered : []);
 
 			const dMap: Record<string, Dealer> = {};
-			dealers.forEach((d) => (dMap[d.dealer_id] = d));
+			(Array.isArray(dealers) ? dealers : []).forEach((d) => {
+				if (d && d.dealer_id) dMap[String(d.dealer_id)] = d;
+			});
 			setDealersMap(dMap);
 
 			const oMap: Record<string, OrderOption> = {};
-			orders.forEach((o) => (oMap[o.order_id] = o));
+			(Array.isArray(orders) ? orders : []).forEach((o) => {
+				if (o && o.order_id) oMap[String(o.order_id)] = o;
+			});
 			setOrdersMap(oMap);
 
 			setError(null);
 		} catch (e: any) {
+			console.error(e);
 			setError(e?.message || "Failed to load data.");
 		} finally {
 			setLoading(false);
@@ -163,6 +184,7 @@ export default function ServiceRequestTable() {
 
 	useEffect(() => {
 		loadAll();
+		 
 	}, [routeId]);
 
 	/* Filter */
@@ -184,7 +206,7 @@ export default function ServiceRequestTable() {
 		);
 	}, [rows, search, dealersMap]);
 
-	const gridRows = useMemo(() => filtered.map((r) => ({ id: r.id, ...r })), [filtered]);
+	const gridRows = useMemo(() => (Array.isArray(filtered) ? filtered.map((r) => ({ id: r.id, ...r })) : []), [filtered]);
 
 	/* --------------------- Create Modal Logic --------------------- */
 	const openCreate = () => {
@@ -193,7 +215,9 @@ export default function ServiceRequestTable() {
 		setCreateOpen(true);
 	};
 	const resolveInvoice = () => {
-		const match = Object.values(ordersMap).find((o) => o.invoice_id === createInvoice.trim());
+		const needle = createInvoice.trim();
+		if (!needle) return setCreateResolvedOrder(null);
+		const match = Object.values(ordersMap).find((o) => String(o.invoice_id) === needle);
 		setCreateResolvedOrder(match || null);
 	};
 	const submitCreate = async () => {
@@ -203,13 +227,14 @@ export default function ServiceRequestTable() {
 				return;
 			}
 			setCreateSubmitting(true);
+			const uid = Number(await getUserId());
 			await createSR({
 				id: generateUniqueServiceId(),
 				order_id: createResolvedOrder.order_id,
 				dealer_id: createResolvedOrder.dealer_id,
 				invoice_id: createResolvedOrder.invoice_id,
 				status: "Open",
-				user_id: Number(await getUserId()),
+				user_id: uid,
 			});
 			setCreateOpen(false);
 			await loadAll();
@@ -232,18 +257,9 @@ export default function ServiceRequestTable() {
 		if (!editRow) return;
 		const patch: Partial<ServiceRequest> & { id: string } = { id: editRow.id };
 		let changed = false;
-		if (editStatus !== editRow.status) {
-			patch.status = editStatus;
-			changed = true;
-		}
-		if ((editNotes || "") !== (editRow.notes || "")) {
-			patch.notes = editNotes;
-			changed = true;
-		}
-		if (!changed) {
-			setEditOpen(false);
-			return;
-		}
+		if (editStatus !== editRow.status) { patch.status = editStatus; changed = true; }
+		if ((editNotes || "") !== (editRow.notes || "")) { patch.notes = editNotes; changed = true; }
+		if (!changed) { setEditOpen(false); return; }
 		try {
 			await updateSR(patch);
 			setRows((prev) => prev.map((r) => (r.id === editRow.id ? { ...r, ...patch } : r)));
@@ -274,9 +290,7 @@ export default function ServiceRequestTable() {
 			renderCell: (p) => (
 				<Box sx={{ display: "flex", alignItems: "center", minWidth: 0 }}>
 					<AssignmentIcon sx={{ fontSize: 16, mr: 0.75, color: "text.secondary" }} />
-					<Typography noWrap fontWeight={700} title={String(p.value ?? "")}>
-						{p.value}
-					</Typography>
+					<Typography noWrap fontWeight={700} title={String(p.value ?? "")}>{p.value}</Typography>
 				</Box>
 			),
 		},
@@ -299,20 +313,15 @@ export default function ServiceRequestTable() {
 			minWidth: 220,
 			flex: 1.4,
 			renderCell: (p) => {
-				const d = dealersMap[p.value as string];
+				const d = dealersMap[String(p.value)];
+				const initial = (d?.full_name || String(p.value || "?"))[0];
 				return (
 					<Box sx={{ display: "flex", alignItems: "center", minWidth: 0 }}>
-						<Avatar sx={{ width: 28, height: 28, mr: 1, bgcolor: "primary.main", fontSize: 12 }}>
-							{(d?.full_name || String(p.value || "?"))[0]}
-						</Avatar>
+						<Avatar sx={{ width: 28, height: 28, mr: 1, bgcolor: "primary.main", fontSize: 12 }}>{initial}</Avatar>
 						<Box sx={{ minWidth: 0 }}>
-							<Typography fontWeight={700} noWrap title={d?.full_name || String(p.value || "")}>
-								{d?.full_name || p.value}
-							</Typography>
+							<Typography fontWeight={700} noWrap title={d?.full_name || String(p.value || "")}>{d?.full_name || p.value}</Typography>
 							{d?.phone && (
-								<Typography variant="caption" color="text.secondary" noWrap title={d.phone}>
-									{d.phone}
-								</Typography>
+								<Typography variant="caption" color="text.secondary" noWrap title={d.phone}>{d.phone}</Typography>
 							)}
 						</Box>
 					</Box>
@@ -328,13 +337,7 @@ export default function ServiceRequestTable() {
 				<Chip
 					label={p.value || "-"}
 					size="small"
-					color={
-						p.value === "Closed"
-							? "success"
-							: p.value === "In Progress"
-								? "warning"
-								: "default"
-					}
+					color={p.value === "Closed" ? "success" : p.value === "In Progress" ? "warning" : "default"}
 					sx={{ height: 24, "& .MuiChip-label": { px: 1, fontSize: 12, fontWeight: 700 } }}
 				/>
 			),
@@ -359,7 +362,6 @@ export default function ServiceRequestTable() {
 							variant="outlined"
 							onClick={(e) => {
 								e.stopPropagation();
-								// open edit modal for consistent UX (upload inside it)
 								openEdit(row);
 							}}
 							sx={{ textTransform: "none" }}
@@ -404,7 +406,7 @@ export default function ServiceRequestTable() {
 
 	return (
 		<>
-			{/* Global top nav (same as Contact) */}
+			{/* Shell */}
 			<Paper
 				sx={{
 					position: "fixed",
@@ -420,7 +422,7 @@ export default function ServiceRequestTable() {
 					bgcolor: "background.paper",
 				}}
 			>
-				{/* Toolbar like Contact: search + New SR + filters button */}
+				{/* Toolbar */}
 				<AppBar position="static" color="transparent" elevation={0} sx={{ flex: "0 0 auto" }}>
 					<Toolbar sx={{ minHeight: 56, gap: 1, justifyContent: "space-between" }}>
 						<Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
@@ -429,13 +431,9 @@ export default function ServiceRequestTable() {
 								onChange={(e) => setSearch(e.target.value)}
 								size="medium"
 								placeholder="Search SRs..."
-								InputProps={{
-									startAdornment: (
-										<InputAdornment position="start">
-											<SearchIcon fontSize="small" />
-										</InputAdornment>
-									),
-								}}
+								InputProps={{ startAdornment: (
+									<InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment>
+								)}}
 								sx={{ width: { xs: 220, sm: 320, md: 420 } }}
 							/>
 						</Box>
@@ -445,12 +443,9 @@ export default function ServiceRequestTable() {
 								New Service Request
 							</Button>
 							<Tooltip title="Open column filters">
-								<IconButton
-									size="small"
-									onClick={() => {
-										(document.querySelector('[data-testid="Open filter panel"]') as HTMLElement | null)?.click();
-									}}
-								>
+								<IconButton size="small" onClick={() => {
+									(document.querySelector('[data-testid="Open filter panel"]') as HTMLElement | null)?.click();
+								}}>
 									<FilterListIcon />
 								</IconButton>
 							</Tooltip>
@@ -460,11 +455,7 @@ export default function ServiceRequestTable() {
 
 				{/* Content */}
 				<Box sx={{ flex: "1 1 auto", minHeight: 0, overflow: "auto", p: 1.25 }}>
-					{error && (
-						<Typography color="error" sx={{ mb: 1 }}>
-							{error}
-						</Typography>
-					)}
+					{error && <Typography color="error" sx={{ mb: 1 }}>{error}</Typography>}
 
 					{!isMobile ? (
 						<DataGrid
@@ -484,51 +475,27 @@ export default function ServiceRequestTable() {
 								fontSize: ".95rem",
 								"& .MuiDataGrid-columnHeaders": {
 									fontWeight: 800,
-									background:
-                    "linear-gradient(90deg, rgba(7,71,166,0.07) 0%, rgba(7,71,166,0.03) 100%)",
+									background: "linear-gradient(90deg, rgba(7,71,166,0.07) 0%, rgba(7,71,166,0.03) 100%)",
 								},
 								"& .MuiDataGrid-columnHeaderTitle": { fontWeight: 800 },
-								"& .MuiDataGrid-cell": {
-									whiteSpace: "nowrap",
-									overflow: "hidden",
-									textOverflow: "ellipsis",
-								},
-								"& .MuiDataGrid-row:nth-of-type(even)": {
-									backgroundColor: "rgba(0,0,0,0.02)",
-								},
-								"& .MuiDataGrid-row:hover": {
-									backgroundColor: "rgba(7,71,166,0.06)",
-								},
+								"& .MuiDataGrid-cell": { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
+								"& .MuiDataGrid-row:nth-of-type(even)": { backgroundColor: "rgba(0,0,0,0.02)" },
+								"& .MuiDataGrid-row:hover": { backgroundColor: "rgba(7,71,166,0.06)" },
 							}}
 							autoHeight={gridRows.length <= 14}
 						/>
 					) : (
-					// Mobile cards (aligned with Contact)
-						<Box
-							sx={{
-								overflowY: "auto",
-								height: "100%",
-								pr: 0.5,
-								"&::-webkit-scrollbar": { width: 6 },
-								"&::-webkit-scrollbar-thumb": {
-									background: theme.palette.grey[400],
-									borderRadius: 3,
-								},
-							}}
-						>
+					// Mobile cards
+						<Box sx={{ overflowY: "auto", height: "100%", pr: 0.5, "&::-webkit-scrollbar": { width: 6 }, "&::-webkit-scrollbar-thumb": { background: theme.palette.grey[400], borderRadius: 3 } }}>
 							<Grid container spacing={1}>
-								{filtered.map((r) => (
+								{rows.map((r) => (
 									<Grid item xs={12} key={r.id}>
 										<Card variant="outlined" sx={{ borderRadius: 2 }}>
 											<CardContent sx={{ py: 1.25 }}>
 												<Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
-													<Avatar sx={{ width: 32, height: 32, mr: 1, bgcolor: "primary.main" }}>
-														{r.id?.[0] ?? "S"}
-													</Avatar>
+													<Avatar sx={{ width: 32, height: 32, mr: 1, bgcolor: "primary.main" }}>{r.id?.[0] ?? "S"}</Avatar>
 													<Box sx={{ minWidth: 0, flex: 1 }}>
-														<Typography fontWeight={700} noWrap title={r.id}>
-															{r.id}
-														</Typography>
+														<Typography fontWeight={700} noWrap title={r.id}>{r.id}</Typography>
 														<Typography variant="caption" color="text.secondary" noWrap>
 															{dealersMap[r.dealer_id]?.full_name || r.dealer_id}
 														</Typography>
@@ -536,13 +503,7 @@ export default function ServiceRequestTable() {
 													<Chip
 														label={r.status}
 														size="small"
-														color={
-															r.status === "Closed"
-																? "success"
-																: r.status === "In Progress"
-																	? "warning"
-																	: "default"
-														}
+														color={r.status === "Closed" ? "success" : r.status === "In Progress" ? "warning" : "default"}
 														sx={{ height: 22, "& .MuiChip-label": { px: 0.75, fontSize: 11 } }}
 													/>
 													<Tooltip title="Edit">
@@ -575,18 +536,10 @@ export default function ServiceRequestTable() {
 			</Paper>
 
 			{/* --------------------- Create Modal --------------------- */}
-			<Dialog
-				open={createOpen}
-				onClose={() => setCreateOpen(false)}
-				fullWidth
-				maxWidth="sm"
-				PaperProps={{ sx: { borderRadius: 2 } }}
-			>
+			<Dialog open={createOpen} onClose={() => setCreateOpen(false)} fullWidth maxWidth="sm" PaperProps={{ sx: { borderRadius: 2 } }}>
 				<DialogTitle sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
 					<Typography variant="h6">New Service Request</Typography>
-					<IconButton onClick={() => setCreateOpen(false)} size="small">
-						<CloseIcon />
-					</IconButton>
+					<IconButton onClick={() => setCreateOpen(false)} size="small"><CloseIcon /></IconButton>
 				</DialogTitle>
 				<DialogContent dividers>
 					<Grid container spacing={2}>
@@ -601,28 +554,12 @@ export default function ServiceRequestTable() {
 								helperText={createResolvedOrder ? `Resolved: Order ${createResolvedOrder.order_id}` : "Leave field to auto-resolve"}
 							/>
 						</Grid>
-
 						<Grid item xs={12} sm={6}>
-							<TextField
-								fullWidth
-								label="Order (resolved)"
-								value={createResolvedOrder?.order_id || ""}
-								InputProps={{ readOnly: true }}
-							/>
+							<TextField fullWidth label="Order (resolved)" value={createResolvedOrder?.order_id || ""} InputProps={{ readOnly: true }} />
 						</Grid>
 						<Grid item xs={12} sm={6}>
-							<TextField
-								fullWidth
-								label="Dealer (resolved)"
-								value={
-									createResolvedOrder
-										? (dealersMap[createResolvedOrder.dealer_id]?.full_name || createResolvedOrder.dealer_id)
-										: ""
-								}
-								InputProps={{ readOnly: true }}
-							/>
+							<TextField fullWidth label="Dealer (resolved)" value={createResolvedOrder ? (dealersMap[createResolvedOrder.dealer_id]?.full_name || createResolvedOrder.dealer_id) : ""} InputProps={{ readOnly: true }} />
 						</Grid>
-
 						<Grid item xs={12} sm={6}>
 							<TextField select fullWidth label="Status" value={"Open"} InputProps={{ readOnly: true }}>
 								<MenuItem value="Open">Open</MenuItem>
@@ -642,18 +579,10 @@ export default function ServiceRequestTable() {
 			</Dialog>
 
 			{/* --------------------- Edit Modal --------------------- */}
-			<Dialog
-				open={editOpen}
-				onClose={() => setEditOpen(false)}
-				fullWidth
-				maxWidth="sm"
-				PaperProps={{ sx: { borderRadius: 2 } }}
-			>
+			<Dialog open={editOpen} onClose={() => setEditOpen(false)} fullWidth maxWidth="sm" PaperProps={{ sx: { borderRadius: 2 } }}>
 				<DialogTitle sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
 					<Typography variant="h6">Edit Service Request</Typography>
-					<IconButton onClick={() => setEditOpen(false)} size="small">
-						<CloseIcon />
-					</IconButton>
+					<IconButton onClick={() => setEditOpen(false)} size="small"><CloseIcon /></IconButton>
 				</DialogTitle>
 				<DialogContent dividers>
 					{editRow ? (
@@ -662,103 +591,48 @@ export default function ServiceRequestTable() {
 								<TextField fullWidth label="SR ID" value={editRow.id} InputProps={{ readOnly: true }} />
 							</Grid>
 							<Grid item xs={12} sm={6}>
-								<TextField
-									select
-									fullWidth
-									label="Status"
-									value={editStatus}
-									onChange={(e) => setEditStatus(e.target.value as ServiceRequest["status"])}
-								>
+								<TextField select fullWidth label="Status" value={editStatus} onChange={(e) => setEditStatus(e.target.value as ServiceRequest["status"]) }>
 									<MenuItem value="Open">Open</MenuItem>
 									<MenuItem value="In Progress">In Progress</MenuItem>
 									<MenuItem value="Closed">Closed</MenuItem>
 								</TextField>
 							</Grid>
-
 							<Grid item xs={12} sm={6}>
-								<TextField
-									fullWidth
-									label="Invoice ID"
-									value={editRow.invoice_id || "-"}
-									InputProps={{ readOnly: true }}
-								/>
+								<TextField fullWidth label="Invoice ID" value={editRow.invoice_id || "-"} InputProps={{ readOnly: true }} />
 							</Grid>
 							<Grid item xs={12} sm={6}>
-								<TextField
-									fullWidth
-									label="Order ID"
-									value={editRow.order_id}
-									InputProps={{ readOnly: true }}
-								/>
+								<TextField fullWidth label="Order ID" value={editRow.order_id} InputProps={{ readOnly: true }} />
 							</Grid>
-
 							<Grid item xs={12}>
-								<TextField
-									fullWidth
-									label="Dealer"
-									value={dealersMap[editRow.dealer_id]?.full_name || editRow.dealer_id}
-									InputProps={{ readOnly: true }}
-								/>
+								<TextField fullWidth label="Dealer" value={dealersMap[editRow.dealer_id]?.full_name || editRow.dealer_id} InputProps={{ readOnly: true }} />
 							</Grid>
-
 							<Grid item xs={12}>
-								<TextField
-									fullWidth
-									label="Notes"
-									value={editNotes}
-									onChange={(e) => setEditNotes(e.target.value)}
-									multiline
-									minRows={3}
-								/>
+								<TextField fullWidth label="Notes" value={editNotes} onChange={(e) => setEditNotes(e.target.value)} multiline minRows={3} />
 							</Grid>
-
 							<Grid item xs={12}>
 								<Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-									<Button
-										size="small"
-										startIcon={<CloudUploadIcon />}
-										variant="outlined"
-										onClick={() => {
-											const input = document.createElement("input");
-											input.type = "file";
-											input.accept = "*/*";
-											input.onchange = (e: any) => uploadInEdit(e.target.files?.[0]);
-											input.click();
-										}}
-									>
-										Upload Attachment
-									</Button>
+									<Button size="small" startIcon={<CloudUploadIcon />} variant="outlined" onClick={() => {
+										const input = document.createElement("input");
+										input.type = "file"; input.accept = "*/*";
+										input.onchange = (e: any) => uploadInEdit(e.target.files?.[0]);
+										input.click();
+									}}>Upload Attachment</Button>
 									{editRow.filename && (
-										<a
-											href={`/uploads/lr-receipts/${editRow.file_path}`}
-											target="_blank"
-											rel="noopener noreferrer"
-										>
-											{editRow.filename}
-										</a>
+										<a href={`/uploads/lr-receipts/${editRow.file_path}`} target="_blank" rel="noopener noreferrer">{editRow.filename}</a>
 									)}
 								</Box>
 							</Grid>
 						</Grid>
-					) : (
-						<Typography>No SR selected</Typography>
-					)}
+					) : (<Typography>No SR selected</Typography>)}
 				</DialogContent>
 				<DialogActions>
 					<Button variant="outlined" onClick={() => setEditOpen(false)}>Cancel</Button>
-					<Button variant="contained" onClick={submitEdit} disabled={!editRow}>
-						Save
-					</Button>
+					<Button variant="contained" onClick={submitEdit} disabled={!editRow}>Save</Button>
 				</DialogActions>
 			</Dialog>
 
 			{/* Snackbar */}
-			<Snackbar
-				open={snack.open}
-				autoHideDuration={2200}
-				onClose={() => setSnack((s) => ({ ...s, open: false }))}
-				anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-			>
+			<Snackbar open={snack.open} autoHideDuration={2200} onClose={() => setSnack((s) => ({ ...s, open: false }))} anchorOrigin={{ vertical: "bottom", horizontal: "center" }}>
 				<Alert onClose={() => setSnack((s) => ({ ...s, open: false }))} severity={snack.type} sx={{ width: "100%" }}>
 					{snack.msg}
 				</Alert>
