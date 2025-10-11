@@ -104,6 +104,14 @@ function App(): JSX.Element {
 			message: "Welcome to the RO CPQ System! Is this quote for a Dealer or an Individual?",
 			options: ["Dealer", "Individual"],
 			path: async (params: Params) => {
+				// Reset status for new quote
+				setStatus({
+					quoteCreated: false,
+					isCreatingQuote: false,
+					existingDealerId: null,
+				});
+				setState(initialState);
+
 				const type = cleanInput(params.userInput) === "Individual" ? "Individual" : "Dealer";
 				setState(prev => ({
 					...prev,
