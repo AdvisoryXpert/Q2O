@@ -11,10 +11,13 @@ module.exports = (db) => {
 			SELECT 
 				q.quote_id,
 				q.status,
-				u.full_name AS user_name
+				kam.full_name AS assigned_kam_name,
+				creator.full_name AS creator_name,
+				q.dealer_id
 			FROM ro_cpq.quotation q
 			JOIN ro_cpq.dealer d ON q.dealer_id = d.dealer_id
-			LEFT JOIN ro_cpq.users u ON q.user_id = u.user_id
+			LEFT JOIN ro_cpq.users kam ON q.assigned_kam_id = kam.user_id
+			LEFT JOIN ro_cpq.users creator ON q.user_id = creator.user_id
 			WHERE d.phone = ? AND q.tenant_id = ? and q.status = 'Draft'
 			ORDER BY q.date_created DESC;
 		`;

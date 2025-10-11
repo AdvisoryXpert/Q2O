@@ -21,7 +21,7 @@ module.exports = (db) => {
 						console.error('Update failed:', err);
 						reject(err);
 					} else {
-						console.log('Updated rows:', result.affectedRows);						
+						//console.log('Updated rows:', result.affectedRows);						
 						resolve(result);
 					}
 					}

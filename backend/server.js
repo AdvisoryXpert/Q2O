@@ -288,7 +288,7 @@ app.post('/api/dealer-quotation', (req, res) => {
     return res.status(401).json({ error: "Unauthorized (missing tenant/user)" });
   }
 
-  if (!full_name || !phone || !location ||
+  if (!phone || !location ||
       tds_level === undefined || hardness_level === undefined) {
     return res.status(400).json({ error: "Missing required fields" });
   }
@@ -324,14 +324,17 @@ app.post('/api/dealer-quotation', (req, res) => {
       // Create new dealer and stamp KAM = creator
       const insertDealerSQL = `
         INSERT INTO ro_cpq.dealer
-          (tenant_id, full_name, phone, location, dealer_type, account_type, account_manager_id)
-        VALUES (?,        ?,         ?,     ?,       ?,           ?,             ?)
+          (tenant_id, full_name, phone, location, dealer_type, account_type, account_manager_id, date_created)
+        VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
       `;
       db.query(
         insertDealerSQL,
         [tenantId, full_name, phone, location, dealer_type, account_type, creatorUserId],
         (err2, dealerResult) => {
-          if (err2) return callback(new Error("Dealer insert failed"));
+          if (err2) {
+            console.error("Dealer insert query failed:", err2);
+            return callback(new Error("Dealer insert failed"));
+          }
           callback(null, dealerResult.insertId);
         }
       );

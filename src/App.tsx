@@ -9,6 +9,7 @@ import CloseChatIcon from "./assets/close_chat_icon.svg?react";
 import { FiRefreshCw } from "react-icons/fi";
 import ChatBot from "./components/ChatBot";
 
+/** ---------------- Types ---------------- */
 type DealerData = {
   full_name: string;
   phone: string;
@@ -16,19 +17,30 @@ type DealerData = {
   location: string;
   dealer_type: string;
   account_type: string;
-}
+};
 
+type QuoteRow = {
+  quote_id: number;
+  assigned_kam_name?: string | null;
+  assigned_kam_id?: number | null;
+  status?: string | null;
+  user_name?: string | null; // fallback if KAM not available
+};
+
+/** ---------------- Component ---------------- */
 function App(): JSX.Element {
-	// Guard to mount ChatBot only once in React 18 StrictMode (dev)
+	// Mount guard for StrictMode double-invoke
 	const mountChatRef = useRef(false);
 	const [mountChat, setMountChat] = useState(false);
 	useEffect(() => {
 		if (mountChatRef.current) return;
 		mountChatRef.current = true;
 		setMountChat(true);
+		console.log("%c[App.tsx] Mounted", "color: orange; font-weight: bold;");
+		return () => console.log("%c[App.tsx] Unmounted", "color: red; font-weight: bold;");
 	}, []);
 
-	// Initial state
+	/** ---------- Local state ---------- */
 	const initialState = {
 		dealerData: {
 			full_name: "",
@@ -44,20 +56,26 @@ function App(): JSX.Element {
 
 	const [state, setState] = useState(initialState);
 	const [accountTypes, setAccountTypes] = useState<string[]>([]);
-
 	const [status, setStatus] = useState({
 		quoteCreated: false,
 		isCreatingQuote: false,
 		existingDealerId: null as string | null,
+		existingQuotes: [] as QuoteRow[],
 	});
-  
+
 	const creationLock = useRef(false);
 
-	const cleanInput = (input: string | undefined): string => {
-		return input?.trim() || "";
-	};
+	/** ---------- Helpers ---------- */
+	const cleanInput = (input: string | undefined): string => input?.trim() || "";
 
-	const createQuotation = async (dealerData: any, total_price: number, product_id: number, user_id: number) => {
+	const validPhone = (phone: string) => /^[6-9]\d{9}$/.test(phone);
+
+	const createQuotation = async (
+		dealerData: any,
+		total_price: number,
+		product_id: number,
+		user_id: number
+	) => {
 		try {
 			const payload = {
 				...dealerData,
@@ -67,41 +85,42 @@ function App(): JSX.Element {
 				product_id,
 				user_id
 			};
-
 			const { data } = await http.post('/dealer-quotation', payload);
-
 			return data.quote_id;
 		} catch (error: any) {
-			console.error("Error saving dealer, quotation & item:", error.response?.data || error.message);
-			throw error; // Re-throw to be caught by the calling function
+			console.error("Error saving dealer, quotation & item:", error?.response?.data || error.message);
+			throw error;
 		}
 	};
 
-	// Fetch existing dealer ID from previous quotes
+	/** ---------- Reactive: prefetch existing dealer_id from quotes by phone ---------- */
 	useEffect(() => {
 		if (state.dealerData.phone && state.dealerData.phone.length >= 10) {
-			const fetchDealerId = async () => {
+			(async () => {
 				try {
-					const { data: quotes } = await http.get(
-						`/quotes/by-phone/${state.dealerData.phone}`
-					);
-					if (quotes.length > 0 && quotes[0].dealer_id) {
-						setStatus(prev => ({ ...prev, existingDealerId: quotes[0].dealer_id }));
+					const { data: quotes } = await http.get(`/quotes/by-phone/${state.dealerData.phone}`);
+					if (Array.isArray(quotes) && quotes.length > 0) {
+						// Try to capture dealer_id from the first item if available
+						setStatus(prev => ({
+							...prev,
+							existingQuotes: quotes,
+						}));
 					} else {
-						setStatus(prev => ({ ...prev, existingDealerId: null }));
+						setStatus(prev => ({ ...prev, existingQuotes: [] }));
 					}
 				} catch (err) {
-					console.error("Error fetching quotes:", err);
-					setStatus(prev => ({ ...prev, existingDealerId: null }));
+					console.error("Error prefetching quotes:", err);
+					setStatus(prev => ({ ...prev, existingQuotes: [] }));
 				}
-			};
-			fetchDealerId();
+			})();
 		}
 	}, [state.dealerData.phone]);
 
+	/** ---------- Flow ---------- */
 	const flow: Flow = {
 		start: {
-			message: "Welcome to the RO CPQ System! Is this quote for a Dealer or an Individual?",
+			message:
+        "Welcome to the RO CPQ System! Is this quote for a Dealer or an Individual?",
 			options: ["Dealer", "Individual"],
 			path: async (params: Params) => {
 				// Reset status for new quote
@@ -109,6 +128,7 @@ function App(): JSX.Element {
 					quoteCreated: false,
 					isCreatingQuote: false,
 					existingDealerId: null,
+					existingQuotes: [],
 				});
 				setState(initialState);
 
@@ -121,12 +141,14 @@ function App(): JSX.Element {
 					},
 				}));
 
+				// Load account types for the selected category
 				try {
 					const { data } = await http.get(`/account-types?category=${type}`);
-					const accountTypeNames = data.map((t: any) => t.account_type_name);
+					const accountTypeNames = Array.isArray(data) ? data.map((t: any) => t.account_type_name) : [];
 					setAccountTypes(accountTypeNames);
 				} catch (err) {
 					console.error("Error fetching account types:", err);
+					setAccountTypes(["Default"]);
 				}
 
 				return "ask_account_type";
@@ -135,37 +157,101 @@ function App(): JSX.Element {
 
 		ask_account_type: {
 			message: "What is your account type?",
-			options: () => accountTypes,
-			path: (params: Params) => {
+			options: () => (accountTypes.length ? accountTypes : ["Default"]),
+			path: (_params: Params) => {
+				const chosen = cleanInput(_params.userInput) || "Default";
 				setState(prev => ({
 					...prev,
 					dealerData: {
 						...prev.dealerData,
-						account_type: cleanInput(params.userInput) || "Default",
+						account_type: chosen,
 					},
 				}));
-				return "choose_flow";
+				// → Immediately ask for phone number (no design-based option at all)
+				return "ask_contact";
 			},
 		},
 
-		choose_flow: {
-			message: "Please choose one of the following flows:",
-			options: ["Design-Based Quote Flow", "TDS-Hardness Based Flow"],
+		ask_contact: {
+			message: "Please enter a valid 10-digit phone number:",
 			path: (params: Params) => {
-				const input = cleanInput(params.userInput);
-				if (input === "Design-Based Quote Flow") return "design_flow_start";
-				if (input === "TDS-Hardness Based Flow") return "ask_name";
-				return "choose_flow";
+				const phone = cleanInput(params.userInput);
+				if (!validPhone(phone)) {
+					// stay in same step
+					return "ask_contact";
+				}
+				setState(prev => ({
+					...prev,
+					dealerData: {
+						...prev.dealerData,
+						phone,
+					},
+				}));
+				return "check_existing";
 			},
 		},
 
-		design_flow_start: {
-			message: "🔧 Design-Based Flow selected. (API will be added later)",
-			path: "end",
+		/** Check if dealer exists; if exists, do NOT prompt create. Show existing quotes (if any). */
+		check_existing: {
+			message: async () => {
+				try {
+					const phone = state.dealerData.phone;
+
+					// 1) Is there a dealer?
+					const { data: dealers } = await http.get(`/dealers/by-phone/${phone}`);
+					const dealer = Array.isArray(dealers) ? dealers[0] : null;
+
+					if (dealer && dealer.dealer_id) {
+						setStatus(prev => ({ ...prev, existingDealerId: String(dealer.dealer_id) }));
+
+						// 2) Fetch quotes for that phone
+						const { data: quotes } = await http.get(`/quotes/by-phone/${phone}`);
+
+						if (Array.isArray(quotes) && quotes.length > 0) {
+							setStatus(prev => ({ ...prev, existingQuotes: quotes }));
+
+							// Show ONLY Quote ID and KAM
+							const quoteList = quotes
+								.map(
+									(q: any, i: number) =>
+										`${i + 1}. Quote ID: ${q.quote_id}, Status: ${q.status}, 
+							Assigned To: ${q.assigned_kam_name || "N/A"}, Created By: ${q.creator_name || "N/A"}`
+								)
+								.join("\n");
+
+							return `Existing Dealer found ✅\nQuotes:\n${quoteList}\n\nDo you want to create a new quotation?`;
+						}
+
+						// Dealer exists but no quotes
+						return "Dealer found. No quotes exist yet.\nDo you want to create a new quotation?";
+					}
+
+					// No dealer found
+					setStatus(prev => ({ ...prev, existingDealerId: null, existingQuotes: [] }));
+					return "No dealer found for this number. Would you like to create a new dealer and proceed?";
+				} catch (err) {
+					console.error("Error checking dealer/quotes:", err);
+					return "Error fetching data. Do you want to continue anyway?";
+				}
+			},
+			// Use buttons instead of free text
+			options: ["Yes", "No"],
+			path: (params: Params) => {
+				const input = cleanInput(params.userInput).toLowerCase();
+				// If dealer exists, Yes => proceed to TDS; No => end
+				// If no dealer exists, Yes => ask for name then proceed; No => end
+				const dealerKnown = !!status.existingDealerId;
+				if (dealerKnown) {
+					return input === "yes" ? "ask_tds" : "end";
+				} else {
+					return input === "yes" ? "ask_name" : "end";
+				}
+			},
 		},
 
+		/** Ask name ONLY when creating a new dealer */
 		ask_name: {
-			message: "Please enter name of associate:",
+			message: "Please enter the name of the associate:",
 			path: (params: Params) => {
 				setState(prev => ({
 					...prev,
@@ -174,75 +260,7 @@ function App(): JSX.Element {
 						full_name: cleanInput(params.userInput),
 					},
 				}));
-				return "ask_contact";
-			},
-		},
-
-		ask_contact: {
-			message: "Please enter valid contact detail:",
-			path: (params: Params) => {
-				const phone = cleanInput(params.userInput);
-				const isValid = /^[6-9]\d{9}$/.test(phone);
-		
-				if (!isValid) {
-					// Stay in the same step and ask again
-					return "ask_contact";
-				}
-		
-				setState(prev => ({
-					...prev,
-					dealerData: {
-						...prev.dealerData,
-						phone: phone,
-					},
-				}));
-		
-				return "check_existing_quotes";
-			},
-		},		
-
-		check_existing_quotes: {
-			message: async () => {
-				try {
-					const { data: dealers } = await http.get(`/dealers/by-phone/${state.dealerData.phone}`);
-					const dealer = dealers[0]; 
-
-					if (!dealer || !dealer.dealer_id) {
-						return `No dealer found for this number.
-						 Would you like to create a new dealer and proceed? (yes/no)`;
-					}
-
-					// Store dealer_id to avoid creating a new one later
-					setStatus(prev => ({ ...prev, existingDealerId: dealer.dealer_id }));
-
-					// 🟡 Step 2: Check if dealer has existing quotes
-					const { data: quotes } = await http.get(`/quotes/by-phone/${state.dealerData.phone}`);
-
-					if (quotes.length === 0) {
-						return `Dealer found, but no quotes exist. 
-						Do you want to create a new quotation? (yes/no)`;
-					}
-
-					const quoteList = quotes
-						.map(
-							(q: any, i: number) =>
-								`${i + 1}. Quote ID: ${q.quote_id}, Status: ${q.status}, 
-							Assigned To: ${q.user_name || "N/A"}`
-						)
-						.join("\n");
-
-					return `Existing Dealer Found ✅\nQuotes:\n${quoteList}
-					\n\nProceed with new quotation? (yes/no)`;
-
-				} catch (err) {
-					console.error("Error checking dealer or quotes:", err);
-					return `Error fetching data. 
-					Do you want to continue anyway? (yes/no)`;
-				}
-			},
-			path: (params: Params) => {
-				const input = cleanInput(params.userInput).toLowerCase();
-				return input === "yes" ? "ask_tds" : "end";
+				return "ask_tds";
 			},
 		},
 
@@ -269,7 +287,8 @@ function App(): JSX.Element {
 		},
 
 		ask_generateQuote: {
-			message: "Do you want to generate a quote? (Type 'yes' to confirm)",
+			message: "Do you want to generate a quote?",
+			options: ["Yes", "No"], // ← buttons only
 			path: (params: Params) => {
 				const input = cleanInput(params.userInput).toLowerCase();
 				return input === "yes" ? "recommend_product" : "end";
@@ -289,13 +308,12 @@ function App(): JSX.Element {
 					creationLock.current = true;
 					setStatus(prev => ({ ...prev, isCreatingQuote: true }));
 
-					// Prepare payload - maintains original structure
+					// Prepare dealer payload
 					const dealerPayload = {
 						...state.dealerData,
 						tds_level: state.tdsLevel,
 						hardness_level: state.hardnessLevel,
-						// Only add dealer_id if we found an existing one
-						...(status.existingDealerId ? { dealer_id: status.existingDealerId } : {})
+						...(status.existingDealerId ? { dealer_id: status.existingDealerId } : {}),
 					};
 
 					const total_price = 0;
@@ -327,11 +345,24 @@ function App(): JSX.Element {
 		},
 
 		end: {
-			message: "✅ Thank you for using the RO CPQ system! Type anything to restart.",
-			path: "start",
+			message: "✅ Thank you for using the RO CPQ system! Would you like to start a new quote?",
+			options: ["Yes, start new quote", "No, I'm done"],
+			path: (params: Params) => {
+				const input = cleanInput(params.userInput).toLowerCase();
+				if (input.startsWith("yes")) {
+					return "start";
+				} else {
+					return "final_end";
+				}
+			},
+		},
+
+		final_end: {
+			message: "Great! Have a nice day."
 		},
 	};
 
+	/** ---------- Render ---------- */
 	return (
 		<div className="App">
 			<header className="App-header">
@@ -342,15 +373,16 @@ function App(): JSX.Element {
 							flow={flow}
 							settings={{
 								audio: { disabled: false, icon: AudioIcon, iconDisabled: AudioIconDisabled },
-								chatInput: { botDelay: 1000 },
+								chatInput: { botDelay: 800 },
 								userBubble: { showAvatar: true },
 								botBubble: { showAvatar: true },
 								voice: { disabled: false },
 								sensitiveInput: { asterisksCount: 6 },
-								header: { title: "RO Chat-Bot", 
-									buttons: [Button.NOTIFICATION_BUTTON, Button.AUDIO_BUTTON, "reset-button", Button.CLOSE_CHAT_BUTTON], 
-									showResetChatButtonLabel: true, 
-									resetChatIcon: FiRefreshCw, 
+								header: {
+									title: "RO Chat-Bot",
+									buttons: [Button.NOTIFICATION_BUTTON, Button.AUDIO_BUTTON, "reset-button", Button.CLOSE_CHAT_BUTTON],
+									showResetChatButtonLabel: true,
+									resetChatIcon: FiRefreshCw,
 									closeChatIcon: CloseChatIcon,
 									showAvatar: true,
 									avatar: botAvatar
