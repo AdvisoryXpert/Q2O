@@ -283,7 +283,7 @@ app.post('/api/dealer-quotation', (req, res) => {
 
   // user & tenant from JWT middleware
   const tenantId = req.tenant_id;
-  const creatorUserId = req.user?.user_id;           // KAM + quote creator
+  const creatorUserId = req.user?.id;           // KAM + quote creator
   if (!tenantId || !creatorUserId) {
     return res.status(401).json({ error: "Unauthorized (missing tenant/user)" });
   }

@@ -75,12 +75,20 @@ function parseJwt<T = any>(token?: string | null): T | null {
  * Token helpers (JWT)
  */
 export function getToken(): string | null {
-	return inMemoryToken;
+	if (inMemoryToken) return inMemoryToken;
+	const token = localStorage.getItem("authToken");
+	if (token) inMemoryToken = token;
+	return token;
 }
 
 export function setToken(token: string | null) {
 	dlog("setToken", !!token);
 	inMemoryToken = token; // Update in-memory token
+	if (token) {
+		localStorage.setItem("authToken", token);
+	} else {
+		localStorage.removeItem("authToken");
+	}
 }
 
 export function authHeader(): { Authorization?: string } {
