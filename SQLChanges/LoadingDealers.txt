@@ -23,7 +23,7 @@ INTO TABLE ro_cpq.dealer_staging
 FIELDS TERMINATED BY ',' ENCLOSED BY '"'
 LINES TERMINATED BY '\r\n'
 IGNORE 1 LINES
-(dealer_name, location, email, phone, dealer_type, account_type, status);
+(dealer_name, location, email, phone, dealer_type, account_type, status,sheet_owner);
 
 LOAD DATA INFILE 'C:/ProgramData/MySQL/MySQL Server 8.0/Uploads/dealer_phone_cleaned.csv'
 INTO TABLE ro_cpq.dealer_phone_staging

@@ -26,6 +26,7 @@ import {
 	FormControlLabel,
 	Switch,
 	Divider,
+	Autocomplete,
 } from "@mui/material";
 import {
 	DataGrid,
@@ -59,6 +60,8 @@ type Dealer = {
   is_important?: number | boolean;
   dealer_type?: string;
   account_type?: string;
+  account_manager_name?: string;
+  account_manager_id?: string | number;
   gst_number?: string;
   alternate_phones?: string[];
 };
@@ -73,7 +76,19 @@ type DealerForm = {
   gst_number?: string;
   is_important?: boolean;
   alternate_phones?: string[];
+  account_manager_name?: string;
+  account_manager_id?: string | number;
 };
+
+type User = {
+  user_id: string | number;
+  full_name: string;
+};
+
+async function fetchKams(): Promise<User[]> {
+	const { data } = await http.get("/followups/users");
+	return data ?? [];
+}
 
 /** API helpers */
 async function fetchDealers(page: number, pageSize: number): Promise<{ rows: Dealer[], totalRows: number }> {
@@ -103,6 +118,9 @@ export default function Contact() {
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [search, setSearch] = useState("");
+	const [selectedKam, setSelectedKam] = useState<string | null>(null);
+	const [knownKamOptions, setKnownKamOptions] = useState<string[]>([]);
+	const [kamUsers, setKamUsers] = useState<User[]>([]);
 
 	// dialogs
 	const [quoteOpen, setQuoteOpen] = useState(false);
@@ -121,6 +139,8 @@ export default function Contact() {
 		gst_number: "",
 		is_important: false,
 		alternate_phones: [],
+		account_manager_name: "",
+		account_manager_id: null,
 	};
 	const [form, setForm] = useState<DealerForm>(emptyForm);
 	const [saving, setSaving] = useState(false);
@@ -132,7 +152,7 @@ export default function Contact() {
 		type: "success",
 	});
 
-	const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 10 });
+	const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 12 });
 	const [totalRows, setTotalRows] = useState(0);
 
 	useEffect(() => {
@@ -151,18 +171,39 @@ export default function Contact() {
 		})();
 	}, [paginationModel]);
 
+	useEffect(() => {
+		(async () => {
+			try {
+				const kams = await fetchKams();
+				setKamUsers(kams);
+				setKnownKamOptions(kams.map(k => k.full_name));
+			} catch {
+				// ignore; dropdown will be empty
+			}
+		})();
+	}, []);
+
 	/** Search filter */
-	const filtered = useMemo(() => {
+	const filteredRows = useMemo(() => {
 		const q = search.trim().toLowerCase();
-		if (!q) return rows;
-		return rows.filter((d) =>
+		let filtered = rows;
+
+		if (selectedKam === "__unassigned__") {
+			filtered = filtered.filter(r => !r.account_manager_name);
+		} else if (selectedKam) {
+			filtered = filtered.filter(r => r.account_manager_name === selectedKam);
+		}
+
+		if (!q) return filtered;
+
+		return filtered.filter((d) =>
 			[d.full_name, d.email, d.phone, d.location, d.account_type, d.dealer_type, d.gst_number]
 				.filter(Boolean)
 				.some((v) => String(v).toLowerCase().includes(q))
 		);
-	}, [rows, search]);
+	}, [rows, search, selectedKam]);
 
-	const gridRows = useMemo(() => filtered.map((d) => ({ id: d.dealer_id, ...d })), [filtered]);
+	const gridRows = useMemo(() => filteredRows.map((d) => ({ id: d.dealer_id, ...d })), [filteredRows]);
 
 	/** Handlers */
 	const openCreate = () => {
@@ -185,6 +226,8 @@ export default function Contact() {
 			gst_number: d.gst_number ?? "",
 			is_important: Number(d.is_important) === 1 || d.is_important === true,
 			alternate_phones: d.alternate_phones || [],
+			account_manager_name: d.account_manager_name || "",
+			account_manager_id: d.account_manager_id || null,
 		});
 		setFormOpen(true);
 	};
@@ -235,6 +278,8 @@ export default function Contact() {
 			"dealer_type",
 			"gst_number",
 			"is_important",
+			"account_manager_name",
+			"account_manager_id",
 		] as const).forEach((k) => {
 			if (newRow[k] !== oldRow[k]) (patch as any)[k] = newRow[k];
 		});
@@ -267,12 +312,13 @@ export default function Contact() {
 				...form,
 				is_important: !!form.is_important,
 				alternate_phones: form.alternate_phones || [],
+				account_manager_id: form.account_manager_id || null,
 			};
 
 			if (formMode === "create") {
 				await createDealer(payload);
 				// safest: refetch to get server ids/defaults
-				setRows(await fetchDealers());
+				setPaginationModel({ page: 0, pageSize: 12 });
 				setSnack({ open: true, msg: "Dealer created", type: "success" });
 			} else if (formMode === "edit" && selected?.dealer_id) {
 				await updateDealer(String(selected.dealer_id), {
@@ -435,6 +481,13 @@ export default function Contact() {
 			),
 		},
 		{
+			field: "account_manager_name",
+			headerName: "KAM",
+			flex: 1,
+			minWidth: 130,
+			editable: true,
+		},
+		{
 			field: "gst_number",
 			headerName: "GST",
 			flex: 0.9,
@@ -508,6 +561,21 @@ export default function Contact() {
 									),
 								}}
 								sx={{ width: { xs: 220, sm: 320, md: 420 } }}
+							/>
+							<Autocomplete
+								size="small"
+								options={["All KAMs", "Unassigned", ...knownKamOptions]}
+								value={selectedKam === '__unassigned__' ? 'Unassigned' : selectedKam ?? "All KAMs"}
+								onChange={(_e, val) => {
+									if (val === "All KAMs") {
+										setSelectedKam(null);
+									} else if (val === "Unassigned") {
+										setSelectedKam("__unassigned__");
+									} else {
+										setSelectedKam(val);
+									}
+								}}
+								renderInput={(params) => <TextField {...params} label="Filter by KAM" />}
 							/>
 							<Button
 								startIcon={<AddIcon />}
@@ -598,7 +666,7 @@ export default function Contact() {
 							}}
 						>
 							<Grid container spacing={1}>
-								{filtered.map((d) => {
+								{filteredRows.map((d) => {
 									const highlighted = Number(d.is_important) === 1 || d.is_important === true;
 									return (
 										<Grid item xs={12} key={d.dealer_id}>
@@ -772,6 +840,22 @@ export default function Contact() {
 									/>
 								}
 								label="Mark as Important"
+							/>
+						</Grid>
+						<Grid item xs={12} sm={6}>
+							<Autocomplete
+								fullWidth
+								options={kamUsers}
+								getOptionLabel={(option) => option.full_name}
+								value={kamUsers.find(u => u.user_id === form.account_manager_id) || null}
+								onChange={(_e, val) => {
+									setForm(f => ({ 
+										...f, 
+										account_manager_id: val?.user_id ?? null,
+										account_manager_name: val?.full_name ?? "",
+									}));
+								}}
+								renderInput={(params) => <TextField {...params} label="KAM" />}
 							/>
 						</Grid>
 					</Grid>

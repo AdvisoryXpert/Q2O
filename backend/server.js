@@ -17,8 +17,11 @@ const http = require('http');
 const app = express();
 
 // ---- 2) CORS / parsers BEFORE auth ----
-const allowedOrigins = ['http://127.0.0.1:3000', 'https://127.0.0.1:3000', 'http://192.168.1.73:3000', 'http://192.168.1.3:3000', 'https://192.168.31.42:5173', 'https://192.168.1.3:5173','https://127.0.0.1:5173'];
+const allowedOrigins = ['http://127.0.0.1:3000', 'https://127.0.0.1:3000', 'http://192.168.1.73:3000', 
+  'http://192.168.1.3:3000', 'https://192.168.31.42:5173', 'https://192.168.1.3:5173',
+  'https://127.0.0.1:5173','https://150.241.244.179:5173','https://150.241.244.179:5000'];
 
+  
 const corsOptions = {
   origin: function (origin, callback) {
     if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
@@ -264,7 +267,7 @@ app.get('/api/me', (req, res) => {
 // Re-expose them under /api so they’re protected:
 
 app.get('/api/quotes-raw', (req, res) => {
-  const sql = 'SELECT * FROM ro_cpq.quotation WHERE tenant_id = ? ORDER BY date_created DESC';
+  const sql = 'SELECT q.*, u.full_name as assigned_kam_name FROM ro_cpq.quotation q LEFT JOIN ro_cpq.users u ON q.assigned_kam_id = u.user_id WHERE q.tenant_id = ? ORDER BY q.date_created DESC';
   db.query(sql, [req.tenant_id], (err, results) => {
     if (err) return res.status(500).json({ error: 'Failed to fetch quotes' });
     res.json(results);
@@ -272,13 +275,20 @@ app.get('/api/quotes-raw', (req, res) => {
 });
 
 app.post('/api/dealer-quotation', (req, res) => {
-  // NOTE: You must add tenant filters/inserts in every query here.
-  // Example updates below:
+  const {
+    full_name, phone, location, total_price,
+    dealer_type, account_type,
+    tds_level, hardness_level
+  } = req.body;
 
-  const { full_name, phone, location, total_price, user_id, dealer_type, 
-          account_type, tds_level, hardness_level } = req.body;
+  // user & tenant from JWT middleware
+  const tenantId = req.tenant_id;
+  const creatorUserId = req.user?.user_id;           // KAM + quote creator
+  if (!tenantId || !creatorUserId) {
+    return res.status(401).json({ error: "Unauthorized (missing tenant/user)" });
+  }
 
-  if (!full_name || !phone || !location || !user_id ||
+  if (!full_name || !phone || !location ||
       tds_level === undefined || hardness_level === undefined) {
     return res.status(400).json({ error: "Missing required fields" });
   }
@@ -288,21 +298,40 @@ app.post('/api/dealer-quotation', (req, res) => {
 
   function checkOrCreateDealer(callback) {
     const checkDealerSQL = `
-            SELECT dealer_id FROM ro_cpq.dealer 
+      SELECT dealer_id, account_manager_id
+      FROM ro_cpq.dealer 
       WHERE phone = ? AND tenant_id = ?
+      LIMIT 1
     `;
-    db.query(checkDealerSQL, [phone, req.tenant_id], (err, existing) => {
+    db.query(checkDealerSQL, [phone, tenantId], (err, existing) => {
       if (err) return callback(new Error("Dealer lookup failed"));
-      if (existing.length > 0) return callback(null, existing[0].dealer_id);
 
+      // If dealer exists, optionally backfill KAM if missing
+      if (existing.length > 0) {
+        const { dealer_id, account_manager_id } = existing[0];
+        if (!account_manager_id) {
+          const upd = `UPDATE ro_cpq.dealer SET account_manager_id = ? WHERE dealer_id = ? AND tenant_id = ?`;
+          db.query(upd, [creatorUserId, dealer_id, tenantId], (e2) => {
+            if (e2) return callback(new Error("Dealer KAM backfill failed"));
+            return callback(null, dealer_id);
+          });
+        } else {
+          return callback(null, dealer_id);
+        }
+        return;
+      }
+
+      // Create new dealer and stamp KAM = creator
       const insertDealerSQL = `
-        INSERT INTO ro_cpq.dealer (tenant_id, full_name, phone, location, dealer_type, account_type)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO ro_cpq.dealer
+          (tenant_id, full_name, phone, location, dealer_type, account_type, account_manager_id)
+        VALUES (?,        ?,         ?,     ?,       ?,           ?,             ?)
       `;
-      db.query(insertDealerSQL, 
-        [req.tenant_id, full_name, phone, location, dealer_type, account_type], 
-        (err, dealerResult) => {
-          if (err) return callback(new Error("Dealer insert failed"));
+      db.query(
+        insertDealerSQL,
+        [tenantId, full_name, phone, location, dealer_type, account_type, creatorUserId],
+        (err2, dealerResult) => {
+          if (err2) return callback(new Error("Dealer insert failed"));
           callback(null, dealerResult.insertId);
         }
       );
@@ -318,20 +347,27 @@ app.post('/api/dealer-quotation', (req, res) => {
         AND ? BETWEEN hardness_min AND hardness_max
       LIMIT 1
     `;
-    db.query(conditionSQL, [req.tenant_id, tds, hardness], (err, rows) => {
+    db.query(conditionSQL, [tenantId, tds, hardness], (err, rows) => {
       if (err) return callback(new Error("Water condition check failed"));
-      callback(null, rows.length > 0 ? rows[0].condition_id : null);
+      callback(null, rows.length ? rows[0].condition_id : null);
     });
   }
 
   function createQuotation(dealerID, callback) {
-    const quoteSQL = `
-      INSERT INTO ro_cpq.quotation (tenant_id, user_id, total_price, status, dealer_id)
-      VALUES (?, ?, ?, 'Draft', ?)
-    `;
-    db.query(quoteSQL, [req.tenant_id, user_id, total_price, dealerID], (err, r) => {
-      if (err) return callback(new Error("Quotation insert failed"));
-      callback(null, r.insertId);
+    // fetch dealer KAM to stamp on quote
+    const qKAM = `SELECT account_manager_id FROM ro_cpq.dealer WHERE dealer_id = ? AND tenant_id = ?`;
+    db.query(qKAM, [dealerID, tenantId], (err, rows) => {
+      if (err) return callback(new Error("Fetch dealer KAM failed"));
+      const assignedKamId = rows?.[0]?.account_manager_id || creatorUserId;
+
+      const quoteSQL = `
+        INSERT INTO ro_cpq.quotation (tenant_id, user_id, total_price, status, dealer_id, assigned_kam_id)
+        VALUES (?,         ?,       ?,           'Draft', ?,         ?)
+      `;
+      db.query(quoteSQL, [tenantId, creatorUserId, total_price, dealerID, assignedKamId], (err2, r) => {
+        if (err2) return callback(new Error("Quotation insert failed"));
+        callback(null, r.insertId);
+      });
     });
   }
 
@@ -341,11 +377,11 @@ app.post('/api/dealer-quotation', (req, res) => {
       FROM ro_cpq.product
       WHERE tenant_id = ? AND condition_id = 3
     `;
-    const params = [req.tenant_id];
+    const params = [tenantId];
 
     if (matchedConditionId) {
       productSQL += ` OR (tenant_id = ? AND condition_id = ${db.escape(matchedConditionId)})`;
-      params.push(req.tenant_id);
+      params.push(tenantId);
     }
 
     db.query(productSQL, params, (err, productResults) => {
@@ -355,8 +391,8 @@ app.post('/api/dealer-quotation', (req, res) => {
       let processed = 0, hasError = false;
 
       productResults.forEach((row) => {
-        addProductToQuotation(quote_id, row.product_id, (err) => {
-          if (err && !hasError) { hasError = true; return callback(err); }
+        addProductToQuotation(quote_id, row.product_id, (err2) => {
+          if (err2 && !hasError) { hasError = true; return callback(err2); }
           processed++;
           if (processed === productResults.length && !hasError) callback(null);
         });
@@ -371,7 +407,7 @@ app.post('/api/dealer-quotation', (req, res) => {
       WHERE tenant_id = ? AND product_id = ?
       ORDER BY attribute_id ASC LIMIT 1
     `;
-    db.query(attributeSQL, [req.tenant_id, product_id], (err, attrRows) => {
+    db.query(attributeSQL, [tenantId, product_id], (err, attrRows) => {
       if (err || attrRows.length === 0) return callback(null);
 
       const attribute_id = attrRows[0].attribute_id;
@@ -381,18 +417,19 @@ app.post('/api/dealer-quotation', (req, res) => {
         WHERE tenant_id = ? AND attribute_id = ?
         ORDER BY pricing_id ASC LIMIT 1
       `;
-      db.query(pricingSQL, [req.tenant_id, attribute_id], (err, priceRows) => {
-        if (err || priceRows.length === 0) return callback(null);
+      db.query(pricingSQL, [tenantId, attribute_id], (err2, priceRows) => {
+        if (err2 || priceRows.length === 0) return callback(null);
 
         const { price, min_quantity } = priceRows[0];
         const insertItemSQL = `
           INSERT INTO ro_cpq.quotationitems 
             (tenant_id, quote_id, product_id, product_attribute_id, quantity, unit_price)
-          VALUES (?, ?, ?, ?, ?, ?)
+          VALUES (?,         ?,       ?,         ?,                   ?,        ?)
         `;
-        db.query(insertItemSQL,
-          [req.tenant_id, quote_id, product_id, attribute_id, min_quantity, price],
-          (err) => err ? callback(new Error("Failed to add product")) : callback(null)
+        db.query(
+          insertItemSQL,
+          [tenantId, quote_id, product_id, attribute_id, min_quantity, price],
+          (err3) => err3 ? callback(new Error("Failed to add product")) : callback(null)
         );
       });
     });
@@ -400,17 +437,18 @@ app.post('/api/dealer-quotation', (req, res) => {
 
   checkOrCreateDealer((err, dealerID) => {
     if (err) return res.status(500).json({ error: err.message });
-    determineWaterCondition(tds, hardness, (err, matchedConditionId) => {
-      if (err) return res.status(500).json({ error: err.message });
-      createQuotation(dealerID, (err, quote_id) => {
-        if (err) return res.status(500).json({ error: err.message });
-        loadProductsForQuotation(quote_id, matchedConditionId, (err) => {
-          if (err) {
-            return res.status(500).json({ error: err.message, quote_id });
+    determineWaterCondition(tds, hardness, (err2, matchedConditionId) => {
+      if (err2) return res.status(500).json({ error: err2.message });
+      createQuotation(dealerID, (err3, quote_id) => {
+        if (err3) return res.status(500).json({ error: err3.message });
+        loadProductsForQuotation(quote_id, matchedConditionId, (err4) => {
+          if (err4) {
+            return res.status(500).json({ error: err4.message, quote_id });
           }
+          // NOTE: You used req.user.id earlier; normalized to user_id
           const createFollowup = require('./routes/CreateFollowup');
-          createFollowup(req.tenant_id, 'quote', quote_id, req.user.id, req.user.id);
-          return res.json({ message: "Dealer, Quotation, and All Quotation Items created", quote_id });
+          createFollowup(tenantId, 'quote', quote_id, creatorUserId, creatorUserId);
+          return res.json({ message: "Dealer, Quotation, and Items created", quote_id });
         });
       });
     });

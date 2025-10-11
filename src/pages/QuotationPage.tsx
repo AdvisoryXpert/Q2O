@@ -17,6 +17,7 @@ import {
 	useMediaQuery,
 	useTheme,
 	TablePagination,
+	Autocomplete,
 } from "@mui/material";
 import { DataGrid, GridColDef, GridToolbar } from "@mui/x-data-grid";
 import SearchIcon from "@mui/icons-material/Search";
@@ -48,19 +49,29 @@ function toINR(n?: number | null) {
 }
 
 /* ---------------- types ---------------- */
-type Quote = {
-  quote_id: number;
-  dealer_id?: number | string | null;
-  dealer_name?: string | null;
-  date_created?: string | null;
-  total_price?: number | null;
-  status?: string | null;
-};
-
+	type Quote = {
+	  quote_id: number;
+	  dealer_id?: number | string | null;
+	  dealer_name?: string | null;
+	  date_created?: string | null;
+	  total_price?: number | null;
+	  status?: string | null;
+	  assigned_kam_name?: string | null;
+	};
 type Props = {
   dealerId?: number | string | null;
   limit?: number;
 };
+
+type User = {
+  user_id: string | number;
+  full_name: string;
+};
+
+async function fetchKams(): Promise<User[]> {
+	const { data } = await http.get("/followups/users");
+	return data ?? [];
+}
 
 /* ---------------- api helpers ---------------- */
 async function fetchQuotes(limit?: number): Promise<Quote[]> {
@@ -153,10 +164,12 @@ export default function QuotationPage({ dealerId, limit }: Props) {
 	const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 	const navigate = useNavigate();
 
-	const [rows, setRows] = useState<Quote[]>([]);
+	const [quotes, setQuotes] = useState<Quote[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [search, setSearch] = useState("");
+	const [selectedKam, setSelectedKam] = useState<string | null>(null);
+	const [kamOptions, setKamOptions] = useState<string[]>([]);
 	const [paginationModel, setPaginationModel] = useState({
 		page: 0,
 		pageSize: 50,
@@ -165,23 +178,34 @@ export default function QuotationPage({ dealerId, limit }: Props) {
 	useEffect(() => {
 		(async () => {
 			try {
+				const kams = await fetchKams();
+				setKamOptions(kams.map(k => k.full_name));
+			} catch {
+				// ignore; dropdown will be empty
+			}
+		})();
+	}, []);
+
+	useEffect(() => {
+		(async () => {
+			try {
 				setLoading(true);
 				setError(null);
 
 				const data = await fetchQuotes(limit);
-				const byDealer =
+				const quotesByDealer =
           dealerId == null
           	? data
           	: data.filter((q) => String(q.dealer_id ?? "") === String(dealerId ?? ""));
 
-				const sorted = [...byDealer].sort((a, b) => {
+				const sortedQuotes = [...quotesByDealer].sort((a, b) => {
 					const da = a?.date_created ? Date.parse(a.date_created) : NaN;
 					const db = b?.date_created ? Date.parse(b.date_created) : NaN;
 					if (!Number.isNaN(db) && !Number.isNaN(da)) return db - da;
 					return (b?.quote_id ?? 0) - (a?.quote_id ?? 0);
 				});
 
-				setRows(limit ? sorted.slice(0, limit) : sorted);
+				setQuotes(limit ? sortedQuotes.slice(0, limit) : sortedQuotes);
 			} catch {
 				setError("Failed to load quotations.");
 			} finally {
@@ -191,29 +215,36 @@ export default function QuotationPage({ dealerId, limit }: Props) {
 	}, [dealerId, limit]);
 
 	/* ---------------- search ---------------- */
-	const filtered = useMemo(() => {
+	const filteredQuotes = useMemo(() => {
 		const q = search.trim().toLowerCase();
-		if (!q) return rows;
-		return rows.filter((d) =>
+		let filtered = quotes;
+
+		if (selectedKam) {
+			filtered = filtered.filter(q => q.assigned_kam_name === selectedKam);
+		}
+
+		if (!q) return filtered;
+
+		return filtered.filter((d) =>
 			[d.quote_id, d.dealer_id, d.dealer_name, d.status, safeDate(d.date_created), toINR(d.total_price)]
 				.filter(Boolean)
 				.some((v) => String(v).toLowerCase().includes(q))
 		);
-	}, [rows, search]);
+	}, [quotes, search, selectedKam]);
 
-	const paginatedFiltered = useMemo(() => {
+	const paginatedQuotes = useMemo(() => {
 		const { page, pageSize } = paginationModel;
 		const start = page * pageSize;
 		const end = start + pageSize;
-		return filtered.slice(start, end);
-	}, [filtered, paginationModel]);
+		return filteredQuotes.slice(start, end);
+	}, [filteredQuotes, paginationModel]);
 
 	/* ---------------- actions ---------------- */
 	const handleDelete = async (d: Quote) => {
 		if (window.confirm(`Delete Quotation "${d.quote_id}"?`)) {
 			try {
 				await deleteQuote(d.quote_id);
-				setRows((prev) => prev.filter((r) => r.quote_id !== d.quote_id));
+				setQuotes((prev) => prev.filter((r) => r.quote_id !== d.quote_id));
 			} catch {
 				window.alert("Failed to delete quotation. Please try again.");
 			}
@@ -255,6 +286,12 @@ export default function QuotationPage({ dealerId, limit }: Props) {
 			}) as any,
 		},
 		{
+			field: "assigned_kam_name",
+			headerName: "KAM",
+			flex: 1,
+			minWidth: 160,
+		},
+		{
 			field: "status",
 			headerName: "Status",
 			flex: 0.8,
@@ -293,7 +330,7 @@ export default function QuotationPage({ dealerId, limit }: Props) {
 		},
 	];
 
-	const gridRows = useMemo(() => paginatedFiltered.map((d) => ({ id: d.quote_id, ...d })), [paginatedFiltered]);
+	const gridQuotes = useMemo(() => paginatedQuotes.map((d) => ({ id: d.quote_id, ...d })), [paginatedQuotes]);
 
 	/* ---------------- render ---------------- */
 	return (
@@ -329,6 +366,13 @@ export default function QuotationPage({ dealerId, limit }: Props) {
 						}}
 						sx={{ width: { xs: 220, sm: 360, md: 480 } }}
 					/>
+					<Autocomplete
+						size="small"
+						options={["All KAMs", ...kamOptions]}
+						value={selectedKam ?? "All KAMs"}
+						onChange={(_e, val) => setSelectedKam(val && val !== "All KAMs" ? val : null)}
+						renderInput={(params) => <TextField {...params} label="Filter by KAM" />}
+					/>
 
 					<Tooltip title="Open column filters">
 						<IconButton
@@ -357,7 +401,7 @@ export default function QuotationPage({ dealerId, limit }: Props) {
 				{!isMobile ? (
 					<DataGrid
 						columns={columns}
-						rows={gridRows}
+						rows={gridQuotes}
 						loading={loading}
 						disableColumnMenu
 						rowSelection={false}
@@ -365,7 +409,7 @@ export default function QuotationPage({ dealerId, limit }: Props) {
 						paginationModel={paginationModel}
 						onPaginationModelChange={setPaginationModel}
 						pageSizeOptions={[20, 50, 100]}
-						rowCount={filtered.length}
+						rowCount={filteredQuotes.length}
 						slots={{ toolbar: GridToolbar }}
 						slotProps={{ toolbar: { showQuickFilter: false } }}
 						columnHeaderHeight={52}
@@ -392,7 +436,7 @@ export default function QuotationPage({ dealerId, limit }: Props) {
 								backgroundColor: "rgba(7,71,166,0.06)",
 							},
 						}}
-						autoHeight={gridRows.length <= 14}
+						autoHeight={gridQuotes.length <= 14}
 					/>
 				) : (
 					<>
@@ -409,7 +453,7 @@ export default function QuotationPage({ dealerId, limit }: Props) {
 							}}
 						>
 							<Grid container spacing={1}>
-								{paginatedFiltered.map((d) => (
+								{paginatedQuotes.map((d) => (
 									<Grid item xs={12} key={d.quote_id}>
 										<Card variant="outlined" sx={{ borderRadius: 2 }}>
 											<CardContent sx={{ py: 1.25 }}>
@@ -466,7 +510,7 @@ export default function QuotationPage({ dealerId, limit }: Props) {
 						</Box>
 						<TablePagination
 							component="div"
-							count={filtered.length}
+							count={filteredQuotes.length}
 							page={paginationModel.page}
 							onPageChange={(e, newPage) => setPaginationModel(prev => ({ ...prev, page: newPage }))}
 							rowsPerPage={paginationModel.pageSize}
