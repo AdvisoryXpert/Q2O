@@ -91,7 +91,7 @@ export default function POSSalesPage() {
 		const fetchDealers = async () => {
 			try {
 				const res = await http.get("/dealers");
-				setDealers((res.data ?? []) as Dealer[]);
+				setDealers((res.data?.rows ?? []) as Dealer[]);
 			} catch (err) {
 				console.error("Failed to fetch dealers", err);
 			}
